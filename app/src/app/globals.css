@@ -355,6 +355,52 @@ body {
   color: var(--text);
 }
 
+/* compact square icon button — row-level actions (e.g. remove recipient) */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.icon-btn:hover:not(:disabled),
+.icon-btn:focus-visible {
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
+  background: var(--err-dim);
+}
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* small inline status pill — e.g. "ERC-7984 confidential token ✓" */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-data), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.badge-ok {
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: var(--ok-dim);
+  color: var(--callout-ok-text);
+}
+
 /* fields */
 .field {
   width: 100%;
@@ -492,6 +538,24 @@ body {
   100% {
     background-position: -50% 0;
   }
+}
+
+/* Interactive redaction: hover/focus lifts the bar to reveal the word beneath —
+   the product's "only you can unseal it" pitch as a microinteraction. */
+.redaction-reveal {
+  cursor: help;
+  user-select: none;
+  transition: background-color var(--dur-med, 240ms) ease, color var(--dur-med, 240ms) ease;
+}
+.redaction-reveal:hover,
+.redaction-reveal:focus-visible {
+  background: var(--gold-dim);
+  color: var(--gold-bright);
+}
+.redaction-reveal:hover::after,
+.redaction-reveal:focus-visible::after {
+  animation: none;
+  opacity: 0;
 }
 
 /* the unseal reveal transition, used on /verify */

@@ -3,16 +3,18 @@
 import { useMemo, useState } from "react";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { useZamaSDK } from "@zama-fhe/react-sdk";
+import { useZamaSDK, useConfidentialIsOperator, useConfidentialSetOperator } from "@zama-fhe/react-sdk";
+import type { ZamaSDK } from "@zama-fhe/sdk";
 import {
   useCreateConfidentialAirdropAndGetAddress,
   useFactoryCustomFee,
   useFactoryDefaultGasFee,
   useFundConfidentialAirdrop,
 } from "@tokenops/sdk/fhe-airdrop/react";
-import { getConfidentialTestTokenAddress } from "@tokenops/sdk";
+import { getConfidentialTestTokenAddress, getFheAirdropFactoryAddress } from "@tokenops/sdk";
 import type { Address, Hex } from "viem";
 import { etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
+import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import type { RecipientRow } from "@/lib/csv";
 import { scaleAmountToUnits } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
@@ -63,7 +65,6 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
   const create = useCreateConfidentialAirdropAndGetAddress();
   const { data: defaultGasFee } = useFactoryDefaultGasFee();
   const { data: customFee } = useFactoryCustomFee(address ? { creator: address } : undefined);
-  const fund = useFundConfidentialAirdrop({ encryptor: () => toTokenOpsEncryptor(zamaSDK.relayer) });
 
   const totalAmountUnits = useMemo(
     () => recipients.reduce((sum, r) => sum + scaleAmountToUnits(r.amount, 6), BigInt(0)),
@@ -101,28 +102,6 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
       });
     } catch (err) {
       setDeployError(err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  async function handleFund() {
-    if (!deployed) return;
-    try {
-      await fund.mutateAsync({
-        token: deployed.token,
-        params: {
-          token: deployed.token,
-          startTimestamp: deployed.startTimestamp,
-          endTimestamp: deployed.endTimestamp,
-          canExtendClaimWindow: false,
-          admin: deployed.admin,
-        },
-        userSalt: deployed.userSalt,
-        deployer: deployed.admin,
-        gasFee: deployed.gasFee,
-        amount: totalAmountUnits,
-      });
-    } catch {
-      // surfaced via fund.error below
     }
   }
 
@@ -179,6 +158,11 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
               Defaults to the CTTT testnet token if available.
             </span>
           )}
+          {tokenValid && (
+            <div className="mt-3">
+              <TokenIdentityCard address={tokenAddress as Address} />
+            </div>
+          )}
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -205,7 +189,7 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
         </div>
         {!windowValid && <p className="text-xs" style={{ color: "var(--err)" }}>Claim window end must be after start.</p>}
         <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-          Extendable claim window: disabled (fixed for this flow).
+          The claim window can&apos;t be extended once the campaign is deployed.
         </p>
       </div>
 
@@ -242,41 +226,18 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
             >
               View deployment tx
             </a>
+            <TokenIdentityCard address={deployed.token} compact className="mt-2" />
           </div>
 
-          <div className="panel p-4">
-            <h3 className="eyebrow">Fund the campaign</h3>
-            <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
-              Before recipients can claim, the airdrop contract needs an encrypted token balance
-              covering the total allocation ({recipients.length} recipient{recipients.length === 1 ? "" : "s"},
-              raw units: <span className="font-data tabular">{totalAmountUnits.toString()}</span>). This requires
-              the factory to be an approved operator on your token (
-              <code className="font-data" style={{ color: "var(--text)" }}>
-                token.setOperator(factory, deadline)
-              </code>
-              ).
-            </p>
-            <button
-              type="button"
-              onClick={handleFund}
-              disabled={fund.isPending || totalAmountUnits === BigInt(0)}
-              className="btn btn-gold mt-3"
-            >
-              {fund.isPending ? "Funding…" : "Fund campaign via factory"}
-            </button>
-            {fund.isSuccess && (
-              <p className="mt-2 text-sm" style={{ color: "var(--ok)" }}>
-                Funding transaction submitted.
-              </p>
-            )}
-            {fund.isError && (
-              <p className="mt-2 text-sm" style={{ color: "var(--err)" }}>
-                {fund.error instanceof Error ? fund.error.message : String(fund.error)} — you can instead fund
-                manually by transferring/wrapping confidential tokens directly to{" "}
-                <span className="font-data">{deployed.airdrop}</span>.
-              </p>
-            )}
-          </div>
+          {address && (
+            <FundingPanel
+              deployed={deployed}
+              recipients={recipients}
+              totalAmountUnits={totalAmountUnits}
+              zamaSDK={zamaSDK}
+              connectedAddress={address}
+            />
+          )}
 
           <div>
             <button type="button" onClick={onNext} className="btn btn-seal">
@@ -284,6 +245,171 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Map a fund-mutation error to a plain-language message an admin can act on. */
+function describeFundError(error: unknown): { message: string; needsApproval: boolean } {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (raw.includes("79f2cb38") || raw.includes("UnauthorizedSpender")) {
+    return {
+      message: "The factory isn't approved to move your tokens yet — complete the approval step first.",
+      needsApproval: true,
+    };
+  }
+  return { message: raw, needsApproval: false };
+}
+
+/**
+ * Two-step funding flow: approve the campaign factory as an ERC-7984 operator
+ * on the token, then fund the deployed airdrop clone. Only mounted once a
+ * campaign is deployed, so `deployed.token` is always a valid address —
+ * `useConfidentialSetOperator` and `useConfidentialIsOperator` build a token
+ * client from their address arguments even while conceptually "disabled", so
+ * they must never be reached with an unvalidated address.
+ */
+function FundingPanel({
+  deployed,
+  recipients,
+  totalAmountUnits,
+  zamaSDK,
+  connectedAddress,
+}: {
+  deployed: DeployedCampaign;
+  recipients: RecipientRow[];
+  totalAmountUnits: bigint;
+  zamaSDK: ZamaSDK;
+  connectedAddress: Address;
+}) {
+  const factoryAddress = getFheAirdropFactoryAddress(sepolia.id);
+
+  const isOperator = useConfidentialIsOperator({
+    address: deployed.token,
+    spender: factoryAddress,
+    holder: connectedAddress,
+  });
+  const setOperator = useConfidentialSetOperator(deployed.token);
+  const fund = useFundConfidentialAirdrop({ encryptor: () => toTokenOpsEncryptor(zamaSDK.relayer) });
+
+  const approved = isOperator.data === true;
+  const fundError = fund.isError ? describeFundError(fund.error) : null;
+
+  async function handleApprove() {
+    if (!factoryAddress) return;
+    try {
+      await setOperator.mutateAsync({ operator: factoryAddress, until: Math.floor(Date.now() / 1000) + 3600 });
+      isOperator.refetch();
+    } catch {
+      // surfaced via setOperator.error below
+    }
+  }
+
+  async function handleFund() {
+    try {
+      await fund.mutateAsync({
+        token: deployed.token,
+        params: {
+          token: deployed.token,
+          startTimestamp: deployed.startTimestamp,
+          endTimestamp: deployed.endTimestamp,
+          canExtendClaimWindow: false,
+          admin: deployed.admin,
+        },
+        userSalt: deployed.userSalt,
+        deployer: deployed.admin,
+        gasFee: deployed.gasFee,
+        amount: totalAmountUnits,
+      });
+    } catch {
+      // surfaced via fund.error below
+    }
+  }
+
+  return (
+    <div className="panel p-4">
+      <h3 className="eyebrow">Fund the campaign</h3>
+      <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
+        Funding moves the encrypted total ({recipients.length} recipient{recipients.length === 1 ? "" : "s"},{" "}
+        <span className="font-data tabular">{totalAmountUnits.toString()}</span> raw units) from your wallet into
+        the campaign so recipients can claim. First allow the campaign factory to move your tokens (a one-time
+        approval), then fund.
+      </p>
+
+      <div className="mt-4 flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <span className="seal-badge shrink-0" data-state={approved ? "done" : "active"} style={{ width: "1.5rem", height: "1.5rem" }}>
+            {approved ? "✓" : "1"}
+          </span>
+          <div className="flex-1">
+            <p className="text-sm" style={{ color: "var(--text)" }}>
+              Allow the campaign factory to move your tokens
+            </p>
+            {isOperator.isLoading && (
+              <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+                Checking approval status…
+              </p>
+            )}
+            {!isOperator.isLoading && approved && (
+              <p className="text-xs" style={{ color: "var(--ok)" }}>
+                Factory approved to move your tokens.
+              </p>
+            )}
+          </div>
+          {!isOperator.isLoading && !approved && (
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={setOperator.isPending || !factoryAddress}
+              className="btn btn-gold shrink-0 text-xs"
+            >
+              {setOperator.isPending ? "Approving…" : "Approve"}
+            </button>
+          )}
+        </div>
+        {setOperator.isError && (
+          <p className="text-xs" style={{ color: "var(--err)" }}>
+            {setOperator.error instanceof Error ? setOperator.error.message : String(setOperator.error)}
+          </p>
+        )}
+
+        <div className="flex items-center gap-3">
+          <span className="seal-badge shrink-0" data-state={approved ? "active" : undefined} style={{ width: "1.5rem", height: "1.5rem" }}>
+            2
+          </span>
+          <div className="flex-1">
+            <p className="text-sm" style={{ color: "var(--text)" }}>
+              Fund the campaign
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleFund}
+            disabled={!approved || fund.isPending || totalAmountUnits === BigInt(0)}
+            className="btn btn-gold shrink-0 text-xs"
+          >
+            {fund.isPending ? "Funding…" : "Fund campaign"}
+          </button>
+        </div>
+      </div>
+
+      {fund.isSuccess && (
+        <p className="mt-3 text-sm" style={{ color: "var(--ok)" }}>
+          Funding transaction submitted.
+        </p>
+      )}
+      {fundError && (
+        <p className="mt-3 text-sm" style={{ color: "var(--err)" }}>
+          {fundError.message}
+          {!fundError.needsApproval && (
+            <>
+              {" "}
+              You can instead fund manually by transferring/wrapping confidential tokens directly to{" "}
+              <span className="font-data">{deployed.airdrop}</span>.
+            </>
+          )}
+        </p>
       )}
     </div>
   );

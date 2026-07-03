@@ -17,6 +17,7 @@ import {
 } from "@tokenops/sdk/fhe-disperse/react";
 import { getConfidentialTestTokenAddress } from "@tokenops/sdk";
 import { DisperseRecipients } from "@/components/disperse/DisperseRecipients";
+import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 import {
   newRecipientEntry,
@@ -221,6 +222,7 @@ export default function DispersePage() {
               Not a valid address.
             </p>
           )}
+          {token && <TokenIdentityCard address={token} />}
           <p className="text-xs" style={{ color: "var(--text-faint)" }}>
             Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
             <Link href="/#faucet" className="link-gold">

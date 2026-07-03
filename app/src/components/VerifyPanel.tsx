@@ -13,6 +13,7 @@ import {
   ZamaError,
 } from "@zama-fhe/sdk";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID } from "@/lib/packet";
+import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -134,6 +135,7 @@ export function VerifyPanel({ initialToken, onVerified }: VerifyPanelProps) {
             That doesn&apos;t look like a valid contract address.
           </p>
         )}
+        {tokenValid && <TokenIdentityCard address={tokenInput.trim() as `0x${string}`} />}
       </section>
 
       {submittedToken && address && isConnected && !wrongChain && (

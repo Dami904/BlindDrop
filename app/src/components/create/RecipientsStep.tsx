@@ -14,6 +14,17 @@ interface RecipientsStepProps {
   onNext: () => void;
 }
 
+/** Compact × icon button for removing a recipient row — ghost by default, err-colored on hover/focus. */
+function RemoveRecipientButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label="Remove recipient" className="icon-btn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+        <path d="M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
 type EntryTab = "csv" | "paste" | "manual";
 
 const TABS: { id: EntryTab; label: string }[] = [
@@ -218,9 +229,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                         className="field tabular mt-1"
                       />
                     </div>
-                    <button type="button" onClick={() => removeEntry(entry.id)} className="btn btn-ghost text-xs">
-                      Remove
-                    </button>
+                    <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
                   </div>
                   {error && (
                     <p className="mt-1 text-xs" style={{ color: "var(--err)" }}>
@@ -272,14 +281,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                         />
                       </td>
                       <td className="px-3 py-1.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeEntry(entry.id)}
-                          className="text-xs hover:opacity-100"
-                          style={{ color: "var(--text-faint)" }}
-                        >
-                          Remove
-                        </button>
+                        <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
                       </td>
                       {error && (
                         <td className="hidden" aria-hidden>

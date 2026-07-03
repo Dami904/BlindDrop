@@ -63,12 +63,30 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="mt-16 flex items-center gap-3 text-xs" style={{ color: "var(--text-faint)" }}>
-          <span className="redaction px-2 py-0.5">recipient list</span>
+        <div
+          className="mt-16 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs"
+          style={{ color: "var(--text-faint)" }}
+        >
+          <span>the</span>
+          <span
+            className="redaction redaction-reveal px-2 py-0.5"
+            tabIndex={0}
+            title="Hover to reveal — that's the point: only you can."
+          >
+            recipient list
+          </span>
           <span>never leaves your browser</span>
           <span aria-hidden>·</span>
-          <span className="redaction px-2 py-0.5 tabular">1,204.50</span>
-          <span>only the recipient can decrypt</span>
+          <span>amounts like</span>
+          <span
+            className="redaction redaction-reveal px-2 py-0.5 tabular"
+            tabIndex={0}
+            title="Hover to reveal — that's the point: only you can."
+          >
+            1,204.50
+          </span>
+          <span>stay encrypted — only the recipient can decrypt</span>
+          <span className="basis-full text-center opacity-60">(hover the redacted bits)</span>
         </div>
       </section>
 
