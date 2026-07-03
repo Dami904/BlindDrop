@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { HeroDecode } from "@/components/HeroDecode";
 import { Reveal } from "@/components/Reveal";
+import { FaucetPanel } from "@/components/FaucetPanel";
 
 const journey = [
   {
     mark: "I",
     title: "Fund",
     body: "Mint or wrap a confidential ERC-7984 token, then top up the airdrop contract. Only your own wallet ever sees the total.",
-    href: "/faucet",
+    href: "/#faucet",
     cta: "Get testnet tokens",
   },
   {
@@ -23,6 +24,54 @@ const journey = [
     body: "Recipients open their packet and claim in one transaction, then decrypt their balance locally to see the plaintext amount.",
     href: "/claim",
     cta: "Claim an allocation",
+  },
+];
+
+const howItWorksSteps = [
+  {
+    n: 1,
+    title: "Get test tokens",
+    href: "/#faucet",
+    cta: "Jump to the faucet",
+    what: "Mint TTT and its confidential ERC-7984 wrapper, CTTT, straight to your wallet.",
+    crypto:
+      "Minting the confidential token creates an encrypted balance on-chain — the amount is public here, but your total balance is stored as ciphertext from this point on.",
+  },
+  {
+    n: 2,
+    title: "Create a distribution",
+    href: "/create",
+    cta: "Start creating",
+    what: "List recipients, deploy an airdrop contract, and fund it with the total allocation.",
+    crypto:
+      "Each recipient's amount gets encrypted client-side before it ever reaches the network, so no observer — including this app — can see who gets how much.",
+  },
+  {
+    n: 3,
+    title: "Share claim packets",
+    href: "/create",
+    cta: "Generate packets",
+    what: "BlindDrop seals one claim packet per recipient: an encrypted amount plus an admin signature authorizing them alone to claim it.",
+    crypto:
+      "The packet is just ciphertext and a signature — send it by any channel you like, it reveals nothing to anyone but its intended recipient.",
+  },
+  {
+    n: 4,
+    title: "Recipient claims",
+    href: "/claim",
+    cta: "Go to claim",
+    what: "The recipient drops their packet in and submits it from the exact wallet it was issued to.",
+    crypto:
+      "The claim transaction moves the encrypted amount on-chain without ever decrypting it — the contract operates on ciphertext directly.",
+  },
+  {
+    n: 5,
+    title: "Verify & decrypt",
+    href: "/claim#verify",
+    cta: "Verify a balance",
+    what: "The recipient reads their new confidential balance and decrypts it locally.",
+    crypto:
+      "A wallet-signed request lets the Zama relayer decrypt just that one balance for that one signer — the plaintext number never leaves the recipient's browser.",
   },
 ];
 
@@ -56,7 +105,7 @@ export default function Home() {
           <Link href="/claim" className="btn btn-ghost px-6 py-3 text-sm">
             Claim tokens
           </Link>
-          <Link href="/faucet" className="btn btn-quiet px-6 py-3 text-sm">
+          <Link href="/#faucet" className="btn btn-quiet px-6 py-3 text-sm">
             Need test tokens? Faucet →
           </Link>
         </div>
@@ -112,10 +161,85 @@ export default function Home() {
         </div>
 
         <Reveal className="mx-auto max-w-5xl px-6 pb-16 text-center">
-          <Link href="/guide" className="link-gold text-sm">
-            New here? Walk through the full journey →
+          <Link href="/#how-it-works" className="link-gold text-sm">
+            New here? Walk through the full journey ↓
           </Link>
         </Reveal>
+      </section>
+
+      <section id="how-it-works" className="scroll-mt-20 border-t" style={{ borderColor: "var(--line)" }}>
+        <div className="mx-auto max-w-3xl px-6 py-16">
+          <Reveal>
+            <p className="eyebrow">Orientation</p>
+          </Reveal>
+          <Reveal delay={60}>
+            <h2 className="font-display mt-2 text-3xl">How BlindDrop works</h2>
+          </Reveal>
+          <Reveal delay={100}>
+            <p className="mt-3" style={{ color: "var(--text-dim)" }}>
+              Five steps, start to finish — from minting test tokens to a recipient decrypting
+              their own allocation. Each step notes what&apos;s actually happening
+              cryptographically underneath.
+            </p>
+          </Reveal>
+
+          <ol className="mt-10 flex flex-col gap-6">
+            {howItWorksSteps.map((step, i) => (
+              <li key={step.n}>
+                <Reveal delay={i * 90}>
+                  <div className="panel flex gap-4 p-5">
+                    <span className="seal-badge shrink-0" data-state={i === 0 ? "active" : undefined}>
+                      {step.n}
+                    </span>
+                    <div>
+                      <h3 className="font-display text-lg">{step.title}</h3>
+                      <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
+                        {step.what}
+                      </p>
+                      <p className="mt-2 text-xs" style={{ color: "var(--text-dim)" }}>
+                        <span className="eyebrow mr-1" style={{ fontSize: "0.625rem" }}>
+                          Under the hood
+                        </span>
+                        {step.crypto}
+                      </p>
+                      <Link href={step.href} className="link-gold mt-3 inline-block text-sm">
+                        {step.cta} →
+                      </Link>
+                    </div>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ol>
+
+          <Reveal delay={howItWorksSteps.length * 90} className="divider-stamped mt-10 pt-6 text-center">
+            <Link href="/#faucet" className="btn btn-seal">
+              Begin at step one →
+            </Link>
+          </Reveal>
+        </div>
+      </section>
+
+      <section id="faucet" className="scroll-mt-20 border-t" style={{ borderColor: "var(--line)" }}>
+        <div className="mx-auto max-w-3xl px-6 py-16">
+          <Reveal>
+            <p className="eyebrow">Step one</p>
+          </Reveal>
+          <Reveal delay={60}>
+            <h2 className="font-display mt-2 text-3xl">Get test tokens</h2>
+          </Reveal>
+          <Reveal delay={100}>
+            <p className="mt-3" style={{ color: "var(--text-dim)" }}>
+              Claim the TokenOps test-token pair on Sepolia — TTT (plain ERC-20) and CTTT (its
+              ERC-7984 confidential wrapper) — so judges can go from zero to a full confidential
+              distribution demo in minutes.
+            </p>
+          </Reveal>
+
+          <Reveal delay={140}>
+            <FaucetPanel />
+          </Reveal>
+        </div>
       </section>
     </div>
   );

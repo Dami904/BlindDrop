@@ -14,11 +14,11 @@ export interface GuideStep {
 }
 
 export const JOURNEY_STEPS: { step: number; label: string; href: string }[] = [
-  { step: 1, label: "Fund", href: "/faucet" },
+  { step: 1, label: "Fund", href: "/#faucet" },
   { step: 2, label: "Create", href: "/create" },
   { step: 3, label: "Packets", href: "/create" },
   { step: 4, label: "Claim", href: "/claim" },
-  { step: 5, label: "Verify", href: "/verify" },
+  { step: 5, label: "Verify", href: "/claim#verify" },
 ];
 
 /**
@@ -27,16 +27,16 @@ export const JOURNEY_STEPS: { step: number; label: string; href: string }[] = [
  * step by step. Keyed by pathname; routes with no entry get no widget.
  */
 export const GUIDE_SCRIPTS: Record<string, GuideStep> = {
-  "/faucet": {
-    step: 1,
-    label: "Fund",
+  "/": {
+    step: null,
+    label: "Welcome",
     messages: [
-      { text: "Case file opened. Step one: every confidential distribution needs a funded, encrypted token balance to draw from." },
-      { text: "Mint yourself some test tokens on Sepolia here, then confirm the transaction in your wallet." },
-      { text: "Under the hood: your balance is stored as ciphertext on-chain from the moment it's minted — no plaintext amount is ever published." },
+      { text: "Case file opened. This is BlindDrop — every allocation encrypted end-to-end, sealed until the recipient opens it." },
+      { text: "Scroll down for the full five-step walkthrough, or jump straight to minting test tokens in the faucet section below." },
+      { text: "Ready to move? Funding is step one — the chips below jump straight to any step in the journey." },
     ],
-    nextHref: "/create",
-    nextLabel: "Create a distribution",
+    nextHref: "/#faucet",
+    nextLabel: "Get test tokens",
   },
   "/create": {
     step: 2,
@@ -57,28 +57,19 @@ export const GUIDE_SCRIPTS: Record<string, GuideStep> = {
       { text: "Recipients receive tokens immediately, in one confidential transaction you sign — no separate claim step required." },
       { text: "Under the hood: amounts are still encrypted end-to-end, but delivered directly rather than held in a packet awaiting redemption." },
     ],
-    nextHref: "/verify",
+    nextHref: "/claim#verify",
     nextLabel: "Recipients can verify their balance",
   },
   "/claim": {
     step: 4,
-    label: "Claim",
+    label: "Claim & Verify",
     messages: [
-      { text: "Step four: claim. Someone has sealed a packet with your name on it." },
+      { text: "Steps four and five, on one page: claim, then verify. Someone has sealed a packet with your name on it." },
       { text: "Submit your packet below — your wallet signs it, proving only you can redeem this allocation." },
-      { text: "Cryptographically: the encrypted amount inside is never revealed on submission, only credited to your confidential balance." },
+      { text: "Then scroll to verify: connect your wallet and request a decrypt to reveal your new confidential balance, for your eyes only." },
     ],
-    nextHref: "/verify",
-    nextLabel: "Verify & decrypt your balance",
-  },
-  "/verify": {
-    step: 5,
-    label: "Verify",
-    messages: [
-      { text: "Final step of the case file: verify." },
-      { text: "Connect your wallet and request a decrypt — you'll sign a message authorizing the relayer to reveal just your own balance." },
-      { text: "Under the hood: the plaintext number is decrypted for your eyes only and never leaves your browser." },
-    ],
+    nextHref: "/claim#verify",
+    nextLabel: "Jump to verify & decrypt",
   },
 };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Address } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -141,9 +142,9 @@ export default function DispersePage() {
         )}
         <p className="text-xs" style={{ color: "var(--text-faint)" }}>
           Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
-          <a href="/faucet" className="link-gold">
+          <Link href="/#faucet" className="link-gold">
             Claim some →
-          </a>
+          </Link>
         </p>
       </section>
 

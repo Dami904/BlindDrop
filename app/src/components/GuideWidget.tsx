@@ -7,8 +7,10 @@ import { GUIDE_SCRIPTS, JOURNEY_STEPS, getGuideScript } from "@/lib/guideScripts
 
 const STORAGE_KEY = "blinddrop:guide-widget:visited";
 
-/** Routes that never show the widget (landing page has its own hero, /guide is the full guide itself). */
-const EXCLUDED_ROUTES = new Set(["/", "/guide"]);
+/** Routes that never show the widget. Currently none — the home page now
+ * also hosts the "How it works" walkthrough and faucet, so it gets a short
+ * welcome/overview script like every other route. */
+const EXCLUDED_ROUTES = new Set<string>([]);
 
 /**
  * "The Archivist" — a floating dossier assistant docked bottom-right on
@@ -171,7 +173,7 @@ export function GuideWidget() {
                   {s.step}. {s.label}
                 </Link>
               ))}
-              <Link href="/guide" className="btn btn-ghost">
+              <Link href="/#how-it-works" className="btn btn-ghost">
                 Open full guide
               </Link>
             </div>

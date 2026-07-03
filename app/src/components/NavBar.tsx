@@ -7,12 +7,10 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
-  { href: "/guide", label: "Guide" },
+  { href: "/", label: "Home" },
   { href: "/create", label: "Create" },
-  { href: "/claim", label: "Claim" },
-  { href: "/verify", label: "Verify" },
+  { href: "/claim", label: "Claim & Verify" },
   { href: "/disperse", label: "Disperse" },
-  { href: "/faucet", label: "Faucet" },
 ];
 
 export function NavBar() {

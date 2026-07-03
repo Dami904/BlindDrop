@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useConfidentialBalance } from "@zama-fhe/react-sdk";
@@ -53,17 +52,40 @@ function describeDecryptError(error: unknown): string {
   return "An unexpected error occurred while decrypting your balance.";
 }
 
-function VerifyContent() {
-  const searchParams = useSearchParams();
-  const tokenFromQuery = searchParams.get("token") ?? "";
+export interface VerifyPanelProps {
+  /**
+   * Token address to pre-fill and auto-submit, e.g. from a `?token=` query
+   * string or a just-completed claim on the same page. Updating this prop
+   * (after a successful claim) re-fills and re-submits the form.
+   */
+  initialToken?: string;
+}
 
+/**
+ * Decrypt-your-allocation panel — reads a confidential ERC-7984 balance via
+ * EIP-712 user decryption against the Zama relayer. Extracted from the
+ * standalone /verify page so it can live as the second section of
+ * /claim ("Claim & Verify").
+ */
+export function VerifyPanel({ initialToken }: VerifyPanelProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
-  const [tokenInput, setTokenInput] = useState(tokenFromQuery);
+  const [tokenInput, setTokenInput] = useState(initialToken ?? "");
   const [submittedToken, setSubmittedToken] = useState<`0x${string}` | undefined>(
-    isHexAddress(tokenFromQuery) ? (tokenFromQuery as `0x${string}`) : undefined
+    initialToken && isHexAddress(initialToken) ? (initialToken as `0x${string}`) : undefined
   );
+
+  // Re-fill and re-submit whenever the caller hands us a fresh token (e.g.
+  // right after a successful claim on the same page).
+  useEffect(() => {
+    if (initialToken && isHexAddress(initialToken)) {
+      setTokenInput(initialToken);
+      setSubmittedToken(initialToken.trim() as `0x${string}`);
+    }
+    // Only re-run when the incoming token itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialToken]);
 
   const wrongChain = !isSepoliaChainId(chainId);
 
@@ -81,15 +103,7 @@ function VerifyContent() {
   const tokenValid = useMemo(() => isHexAddress(tokenInput), [tokenInput]);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <p className="eyebrow">The unsealing</p>
-      <h1 className="font-display mt-2 text-3xl">Verify &amp; Decrypt My Allocation</h1>
-      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
-        Read your confidential ERC-7984 balance and decrypt it locally via the Zama relayer. Only
-        the connected wallet can decrypt its own balance — no one else, including this app, can see
-        the plaintext amount.
-      </p>
-
+    <div>
       {!isConnected && <div className="callout callout-warn mt-8">Connect your wallet to verify a balance.</div>}
 
       {isConnected && wrongChain && (
@@ -185,13 +199,5 @@ function VerifyContent() {
         balance never leaves your browser.
       </p>
     </div>
-  );
-}
-
-export default function VerifyPage() {
-  return (
-    <Suspense fallback={null}>
-      <VerifyContent />
-    </Suspense>
   );
 }

@@ -15,7 +15,12 @@ import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanAddressUrl, etherscanTxUrl
 const CTTT_MINT_AMOUNT = BigInt(1_000_000_000); // 1,000 CTTT (6-decimal units)
 const TTT_MINT_AMOUNT = BigInt(1_000) * BigInt(10) ** BigInt(18); // 1,000 TTT (18-decimal units)
 
-export default function FaucetPage() {
+/**
+ * Compact testnet-faucet panel — mint the TokenOps TTT/CTTT test-token pair
+ * on Sepolia. Extracted from the standalone /faucet page so it can be
+ * embedded as the "Get test tokens" section of the home page.
+ */
+export function FaucetPanel() {
   const { isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const queryClient = useQueryClient();
@@ -38,21 +43,13 @@ export default function FaucetPage() {
   const ttt = meta?.underlying;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <p className="eyebrow">Step one</p>
-      <h1 className="font-display mt-2 text-3xl">Testnet Faucet</h1>
-      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
-        Claim the TokenOps test-token pair on Sepolia — TTT (plain ERC-20) and CTTT (its
-        ERC-7984 confidential wrapper) — so judges can go from zero to a full confidential
-        distribution demo in minutes.
-      </p>
-
+    <div>
       {!isConnected && (
-        <div className="callout callout-warn mt-8">Connect your wallet to claim test tokens.</div>
+        <div className="callout callout-warn mt-2">Connect your wallet to claim test tokens.</div>
       )}
 
       {isConnected && wrongChain && (
-        <div className="callout callout-warn callout-between mt-8">
+        <div className="callout callout-warn callout-between mt-2">
           <span>Switch to Sepolia (chain {SEPOLIA_CHAIN_ID}) to use the faucet.</span>
           <button
             type="button"
@@ -65,8 +62,8 @@ export default function FaucetPage() {
         </div>
       )}
 
-      <section className="panel mt-8 p-6">
-        <h2 className="font-display text-lg">Token addresses</h2>
+      <section className="panel mt-6 p-6">
+        <h3 className="font-display text-lg">Token addresses</h3>
         {metaLoading && (
           <p className="mt-3 text-sm" style={{ color: "var(--text-dim)" }}>
             <span className="redaction inline-block h-4 w-48 rounded align-middle" /> Loading faucet metadata…
@@ -180,7 +177,7 @@ export default function FaucetPage() {
           Next: create a distribution →
         </Link>
         {cttt?.address && (
-          <Link href={`/verify?token=${cttt.address}`} className="link-gold">
+          <Link href={`/claim?token=${cttt.address}#verify`} className="link-gold">
             Check your confidential balance →
           </Link>
         )}
