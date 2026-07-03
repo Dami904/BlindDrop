@@ -6,7 +6,6 @@ import { RecipientsStep } from "@/components/create/RecipientsStep";
 import { CampaignStep, type DeployedCampaign } from "@/components/create/CampaignStep";
 import { ClaimPacketsStep } from "@/components/create/ClaimPacketsStep";
 import { newRecipientEntry, validateRecipientEntries, type RecipientEntry } from "@/lib/csv";
-import { OnboardingHint } from "@/components/OnboardingHint";
 
 function randomSalt(): Hex {
   const bytes = new Uint8Array(32);
@@ -37,13 +36,6 @@ export default function CreatePage() {
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>
-
-      <OnboardingHint
-        step={2}
-        total={5}
-        title="Step two: create"
-        body="List recipients, deploy the airdrop contract, then seal an encrypted claim packet for each address."
-      />
 
       <ol className="mt-8 flex items-center gap-3 text-sm">
         {STEPS.map((s, i) => {

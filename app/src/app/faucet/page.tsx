@@ -11,7 +11,6 @@ import {
   useMintUnderlying,
 } from "@tokenops/sdk/testnet-faucet/react";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
-import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CTTT_MINT_AMOUNT = BigInt(1_000_000_000); // 1,000 CTTT (6-decimal units)
 const TTT_MINT_AMOUNT = BigInt(1_000) * BigInt(10) ** BigInt(18); // 1,000 TTT (18-decimal units)
@@ -47,15 +46,6 @@ export default function FaucetPage() {
         ERC-7984 confidential wrapper) — so judges can go from zero to a full confidential
         distribution demo in minutes.
       </p>
-
-      <OnboardingHint
-        step={1}
-        total={5}
-        title="Start here"
-        body="Mint test tokens first — a confidential distribution needs a funded, encrypted token balance to draw from."
-        nextHref="/create"
-        nextLabel="Then create a distribution"
-      />
 
       {!isConnected && (
         <div className="callout callout-warn mt-8">Connect your wallet to claim test tokens.</div>

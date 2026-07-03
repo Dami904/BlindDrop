@@ -14,7 +14,6 @@ import {
   SEPOLIA_CHAIN_ID,
   type ClaimPacket,
 } from "@/lib/packet";
-import { OnboardingHint } from "@/components/OnboardingHint";
 
 type LoadState =
   | { kind: "idle" }
@@ -116,15 +115,6 @@ export default function ClaimPage() {
         Open the claim packet your airdrop admin gave you, then submit it from the connected
         wallet it was issued to.
       </p>
-
-      <OnboardingHint
-        step={4}
-        total={5}
-        title="Step four: claim"
-        body="Your packet holds an encrypted amount and a one-time signature — only your wallet can submit it."
-        nextHref="/verify"
-        nextLabel="Then verify & decrypt your balance"
-      />
 
       {!isConnected && (
         <div className="callout callout-warn mt-8">Connect your wallet to continue.</div>

@@ -24,7 +24,6 @@ import {
 } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanTxUrl } from "@/lib/packet";
-import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -108,15 +107,6 @@ export default function DispersePage() {
         Batch-send encrypted token amounts to many recipients in a single confidential
         transaction — no campaign or claim step required.
       </p>
-
-      <OnboardingHint
-        step={2}
-        total={5}
-        title="Alternative to the claim-packet flow"
-        body="Skips claim packets entirely — recipients get their tokens immediately in one confidential transaction you sign."
-        nextHref="/verify"
-        nextLabel="Recipients can verify their balance"
-      />
 
       {!isConnected && (
         <div className="callout callout-warn mt-8">Connect your wallet to disperse tokens.</div>

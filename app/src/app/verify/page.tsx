@@ -14,7 +14,6 @@ import {
   ZamaError,
 } from "@zama-fhe/sdk";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID } from "@/lib/packet";
-import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -90,13 +89,6 @@ function VerifyContent() {
         the connected wallet can decrypt its own balance — no one else, including this app, can see
         the plaintext amount.
       </p>
-
-      <OnboardingHint
-        step={5}
-        total={5}
-        title="Last step of the journey"
-        body="Your wallet signs a request the relayer uses to decrypt just your own balance — the plaintext number never leaves your browser."
-      />
 
       {!isConnected && <div className="callout callout-warn mt-8">Connect your wallet to verify a balance.</div>}
 

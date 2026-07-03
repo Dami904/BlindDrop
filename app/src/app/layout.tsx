@@ -3,6 +3,7 @@ import { Special_Elite, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { NavBar } from "@/components/NavBar";
+import { GuideWidget } from "@/components/GuideWidget";
 
 const specialElite = Special_Elite({
   variable: "--font-special-elite",
@@ -42,6 +43,7 @@ export default function RootLayout({
         <Providers>
           <NavBar />
           <main className="flex flex-1 flex-col">{children}</main>
+          <GuideWidget />
         </Providers>
       </body>
     </html>
