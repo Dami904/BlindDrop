@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ShieldDrop — Confidential Token Distribution",
+  title: "BlindDrop — Confidential Token Distribution",
   description:
     "Confidential airdrops on Zama FHEVM via TokenOps — amounts encrypted end-to-end, recipient list never published on-chain.",
 };

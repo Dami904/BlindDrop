@@ -10,7 +10,7 @@ export default function Home() {
         Confidential airdrops, end to end.
       </h1>
       <p className="mt-6 max-w-2xl text-lg text-zinc-400">
-        ShieldDrop encrypts distribution amounts with fully homomorphic
+        BlindDrop encrypts distribution amounts with fully homomorphic
         encryption and keeps recipient lists off-chain — token creators
         disperse in private, and recipients claim without ever exposing
         the size of the drop.

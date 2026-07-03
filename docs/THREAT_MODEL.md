@@ -1,6 +1,6 @@
-# Threat Model — ShieldDrop
+# Threat Model — BlindDrop
 
-ShieldDrop is a frontend/product layer over TokenOps' audited FHEVM contracts
+BlindDrop is a frontend/product layer over TokenOps' audited FHEVM contracts
 (`fhe-airdrop` clones from the TokenOps factory, `fhe-disperse` singleton) on Sepolia,
 driven exclusively through `@tokenops/sdk`. This document states exactly what is and is not
 confidential, and who must be trusted for what. Claims are scoped precisely — nothing here
@@ -23,8 +23,8 @@ is aspirational.
 
 ## Trust assumptions
 
-1. **TokenOps contracts** — audited by OpenZeppelin (Dec 2025: 1 medium, 3 low, 3 notes; substantially resolved). We deploy clones from their factory and add no contract code, so the audit applies to what we run. The known accepted limitation: the admin is a **trusted issuer** of claim authorizations (a malicious admin could issue none, or wrong amounts). ShieldDrop does not change this; it is the reference design's trust model.
-2. **The admin's browser** — plaintext amounts and the full recipient list exist client-side during campaign creation. A compromised admin machine leaks the list. ShieldDrop never transmits the list to any server (no backend; all SDK calls go wallet→chain / browser→Zama relayer).
+1. **TokenOps contracts** — audited by OpenZeppelin (Dec 2025: 1 medium, 3 low, 3 notes; substantially resolved). We deploy clones from their factory and add no contract code, so the audit applies to what we run. The known accepted limitation: the admin is a **trusted issuer** of claim authorizations (a malicious admin could issue none, or wrong amounts). BlindDrop does not change this; it is the reference design's trust model.
+2. **The admin's browser** — plaintext amounts and the full recipient list exist client-side during campaign creation. A compromised admin machine leaks the list. BlindDrop never transmits the list to any server (no backend; all SDK calls go wallet→chain / browser→Zama relayer).
 3. **Zama relayer/coprocessor network** — availability and correctness of FHE operations and user decryption, per the Zama Protocol's own trust model. The relayer cannot decrypt arbitrary values; user decryption requires the owner's EIP-712 signature.
 4. **Claim-packet delivery channel** — packets are bearer-ish: a packet reveals one recipient's (encrypted) authorization and, to its holder, that recipient's inclusion. The claim itself can only be executed to the bound recipient (input proof binds `(contract, recipient)`; the contract pays out to the authorized recipient), so a stolen packet leaks membership of one address but cannot redirect funds. Deliver packets over private channels.
 

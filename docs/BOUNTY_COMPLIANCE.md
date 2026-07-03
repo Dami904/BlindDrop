@@ -3,7 +3,7 @@
 Requirement-by-requirement mapping from the bounty text to this project.
 Source: [Season 3 announcement](https://www.zama.org/post/zama-developer-program-mainnet-season-3-composable-privacy-is-the-key).
 
-| # | Bounty requirement (verbatim/paraphrased) | How ShieldDrop satisfies it | Status |
+| # | Bounty requirement (verbatim/paraphrased) | How BlindDrop satisfies it | Status |
 |---|---|---|---|
 | 1 | "Create the best confidential application **using the TokenOps SDK** on the Zama Protocol" | Built directly on `@tokenops/sdk@1.1.1`: `fhe-airdrop` factory client + React hooks (campaign creation, claim authorizations, claims), `fhe-disperse` singleton client, `testnet-faucet` client. No forked or bypassed SDK code paths. | In progress |
 | 2 | "dApp powering a **confidential airdrop or confidential disperse flow**" | Both flows in one app: `/create` (airdrop campaign: CSV → encrypt → deploy clone → claim packets) and `/disperse` (one-shot confidential batch send). | In progress |

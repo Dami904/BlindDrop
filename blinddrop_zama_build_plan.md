@@ -14,7 +14,7 @@
 > contracts — differentiation moves to product/UX: batch CSV → claim-packet generation & delivery,
 > airdrop + disperse in one app, judge self-serve faucet, verify-&-decrypt screen. UX is the
 > primary judging criterion, so this pivot aligns with, not against, the win condition.
-> Sections below describing the custom ShieldDrop contract are superseded by this record.
+> Sections below describing the custom BlindDrop contract are superseded by this record.
 
 ## 0. Strategy: comply with the bounty first, differentiate second
 
@@ -31,7 +31,7 @@ Two hard constraints drive everything below:
 
 ---
 
-## 1. Product: "ShieldDrop" — Confidential Airdrop with a Private Recipient List
+## 1. Product: "BlindDrop" — Confidential Airdrop with a Private Recipient List
 
 **One-line pitch:** A confidential token distribution app (TokenOps SDK + ERC-7984 + FHEVM) where amounts stay encrypted end-to-end **and the recipient list itself never appears on-chain** — eligibility is a salted Merkle root plus per-recipient proofs delivered privately, with no per-claim admin signature.
 
@@ -72,17 +72,17 @@ Zama's FHEVM tooling, mocks, templates, and the TokenOps SDK are Hardhat-first; 
 
 ```
 contracts/
-├── ShieldDrop.sol                  # fund (encrypted inputs → contract-owned euint64s),
+├── BlindDrop.sol                  # fund (encrypted inputs → contract-owned euint64s),
 │                                   # claim (salted merkle + claimed bitmap), setPaused, sweep
-├── interfaces/IShieldDrop.sol
+├── interfaces/IBlindDrop.sol
 └── test/ConfidentialToken.sol      # ERC-7984 demo token (OZ confidential-contracts), mintable for judges
 
 test/
-├── ShieldDrop.test.ts              # unit: claim ok, double-claim revert, bad proof revert,
+├── BlindDrop.test.ts              # unit: claim ok, double-claim revert, bad proof revert,
 │                                   # wrong-sender revert, paused revert, window-end revert
-├── ShieldDrop.props.test.ts        # property-style: Σ(claimed) ≤ funded, bitmap monotonic,
+├── BlindDrop.props.test.ts        # property-style: Σ(claimed) ≤ funded, bitmap monotonic,
 │                                   # claim idempotence — randomized over recipient sets
-└── ShieldDrop.sepolia.test.ts      # integration on Sepolia against the real coprocessor + relayer
+└── BlindDrop.sepolia.test.ts      # integration on Sepolia against the real coprocessor + relayer
 
 scripts/
 └── deploy.ts                       # deploy + Etherscan verification
@@ -108,7 +108,7 @@ Merkle verification: OZ `MerkleProof.sol` directly — don't reinvent. Tree buil
 **Day 1 — Rules check, then contracts + tests core**
 - **Hour 1:** read the bounty rules page + TokenOps SDK docs; write the skeleton of `BOUNTY_COMPLIANCE.md`; confirm the SDK-usage plan (§0). If rules demand more SDK/reference-contract usage than assumed, pivot now.
 - Scaffold Hardhat + `@fhevm/solidity` + `@openzeppelin/confidential-contracts` + FHEVM Hardhat plugin; confirm mocked FHE tests run.
-- Write `ShieldDrop.sol` per §2: fund (external inputs → owned euint64s), claim (salted merkle + bitmap + `msg.sender` binding), setPaused, post-window sweep.
+- Write `BlindDrop.sol` per §2: fund (external inputs → owned euint64s), claim (salted merkle + bitmap + `msg.sender` binding), setPaused, post-window sweep.
 - Unit tests: claim success, double-claim, invalid proof, claim as wrong sender, paused, window-ended. Green test run before sleep.
 
 **Day 2 — Frontend + FHEVM integration**
