@@ -11,7 +11,6 @@ const GLYPHS = "█▓▒░#%&$@01".split("");
  */
 export function HeroDecode({ text, as: Tag = "span" }: { text: string; as?: "span" | "h1" }) {
   const [display, setDisplay] = useState(text);
-  const [settled, setSettled] = useState(false);
   const doneRef = useRef(false);
 
   useEffect(() => {
@@ -19,22 +18,14 @@ export function HeroDecode({ text, as: Tag = "span" }: { text: string; as?: "spa
     doneRef.current = true;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      setSettled(true);
-      return;
-    }
+    if (reduceMotion) return;
 
     const chars = text.split("");
     let frame = 0;
-    // Slower, weighted pace — glyphs settle left-to-right like light
-    // resolving through ciphertext rather than a fast typewriter tick.
-    const totalFrames = 22;
+    const totalFrames = 14;
     const interval = setInterval(() => {
       frame++;
-      // ease the reveal curve so it decelerates into the final word
-      const t = frame / totalFrames;
-      const eased = 1 - Math.pow(1 - t, 2.2);
-      const revealCount = Math.floor(eased * chars.length);
+      const revealCount = Math.floor((frame / totalFrames) * chars.length);
       setDisplay(
         chars
           .map((c, i) => {
@@ -47,22 +38,11 @@ export function HeroDecode({ text, as: Tag = "span" }: { text: string; as?: "spa
       if (frame >= totalFrames) {
         clearInterval(interval);
         setDisplay(text);
-        setSettled(true);
       }
-    }, 55);
+    }, 40);
 
     return () => clearInterval(interval);
   }, [text]);
 
-  return (
-    <Tag
-      aria-label={text}
-      style={{
-        transition: "text-shadow 500ms ease-out",
-        textShadow: settled ? "none" : "0 0 18px var(--seal-bright)",
-      }}
-    >
-      {display}
-    </Tag>
-  );
+  return <Tag aria-label={text}>{display}</Tag>;
 }

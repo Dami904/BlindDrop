@@ -141,16 +141,12 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
 
       {(isRunning || packets.length > 0) && (
         <div>
-          <div
-            className={`h-2 w-full overflow-hidden rounded-full ${isRunning ? "fhe-scan" : ""}`}
-            style={{ background: "var(--ink-3)" }}
-          >
+          <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--ink-3)" }}>
             <div
               className="h-full transition-all"
               style={{
                 width: `${total === 0 ? 0 : (done / total) * 100}%`,
-                background: "var(--gradient-spectral)",
-                boxShadow: isRunning ? "var(--glow-seal)" : "none",
+                background: "linear-gradient(90deg, var(--seal), var(--gold))",
                 transitionDuration: "var(--dur-med)",
               }}
             />

@@ -185,8 +185,7 @@ export function GuideWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close the Archivist guide" : "Open the Archivist guide"}
         aria-expanded={open}
-        className="seal-badge mr-3 mb-3 h-11 w-11 shrink-0 !text-base sm:mr-0"
-        style={{ boxShadow: "var(--glow-seal)" }}
+        className="seal-badge mr-3 mb-3 h-11 w-11 shrink-0 !text-base shadow-lg sm:mr-0"
         data-state={open ? "active" : undefined}
       >
         {open ? "✕" : "?"}

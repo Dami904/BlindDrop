@@ -29,25 +29,16 @@ const journey = [
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
-      <section className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col items-center px-6 pt-20 pb-16 text-center sm:pt-28">
-        <div className="hero-aura" aria-hidden />
-
+      <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center px-6 pt-20 pb-16 text-center sm:pt-28">
         <div className="eyebrow flex items-center gap-2">
           <SealMark />
           Zama FHEVM · TokenOps SDK · Sepolia
         </div>
 
-        <h1 className="font-display mt-6 max-w-3xl text-4xl leading-[1.05] sm:text-7xl">
+        <h1 className="font-display mt-6 max-w-3xl text-4xl leading-tight sm:text-6xl">
           <HeroDecode text="Every allocation," />
           <br />
-          <span
-            style={{
-              backgroundImage: "var(--gradient-reveal)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
+          <span style={{ color: "var(--gold)" }}>
             <HeroDecode text="sealed" /> until opened.
           </span>
         </h1>

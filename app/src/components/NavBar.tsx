@@ -35,17 +35,7 @@ export function NavBar() {
           className="font-display text-lg tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          Blind
-          <span
-            style={{
-              backgroundImage: "var(--gradient-spectral)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            Drop
-          </span>
+          Blind<span style={{ color: "var(--seal)" }}>Drop</span>
         </Link>
         <div className="hidden items-center gap-1 sm:flex">
           {links.map((link) => {
@@ -56,16 +46,13 @@ export function NavBar() {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className="relative px-3 py-2 font-data text-xs tracking-wide uppercase transition-colors"
-                style={{ color: active ? "var(--cipher-cyan)" : "var(--text-dim)" }}
+                style={{ color: active ? "var(--gold)" : "var(--text-dim)" }}
               >
                 {link.label}
                 {active && (
                   <span
-                    className="absolute inset-x-2 -bottom-[1px] h-[2px] rounded-full"
-                    style={{
-                      background: "var(--gradient-spectral)",
-                      boxShadow: "0 0 8px var(--cipher-cyan)",
-                    }}
+                    className="absolute inset-x-2 -bottom-[1px] h-[2px]"
+                    style={{ background: "var(--gold)" }}
                   />
                 )}
               </Link>
@@ -103,8 +90,8 @@ export function NavBar() {
                   aria-current={active ? "page" : undefined}
                   className="rounded-[var(--r-sm)] px-3 py-2.5 font-data text-sm uppercase tracking-wide"
                   style={{
-                    color: active ? "var(--cipher-cyan)" : "var(--text-dim)",
-                    background: active ? "var(--seal-dim)" : "transparent",
+                    color: active ? "var(--gold)" : "var(--text-dim)",
+                    background: active ? "var(--gold-dim)" : "transparent",
                   }}
                 >
                   {link.label}
