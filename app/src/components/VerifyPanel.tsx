@@ -89,17 +89,6 @@ export function VerifyPanel({ initialToken }: VerifyPanelProps) {
 
   const wrongChain = !isSepoliaChainId(chainId);
 
-  const balance = useConfidentialBalance(
-    {
-      address: submittedToken as `0x${string}`,
-      account: address,
-    },
-    {
-      enabled: !!submittedToken && !!address && isConnected && !wrongChain,
-      retry: false,
-    }
-  );
-
   const tokenValid = useMemo(() => isHexAddress(tokenInput), [tokenInput]);
 
   return (
@@ -145,12 +134,42 @@ export function VerifyPanel({ initialToken }: VerifyPanelProps) {
         )}
       </section>
 
-      {submittedToken && isConnected && !wrongChain && (
-        <section className="panel mt-10 p-6">
-          <h2 className="font-display text-lg">Your confidential balance</h2>
-          <p className="mt-1 font-data text-xs" style={{ color: "var(--text-faint)" }}>
-            Token {submittedToken} · account {address}
-          </p>
+      {submittedToken && address && isConnected && !wrongChain && (
+        <ConfidentialBalanceSection token={submittedToken} account={address} />
+      )}
+
+      <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
+        Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer — the plaintext
+        balance never leaves your browser.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Rendered only once a token address exists: `useConfidentialBalance`
+ * constructs a token client from `address` unconditionally (even when the
+ * query is disabled), so mounting it with `undefined` throws viem's
+ * InvalidAddressError and crashes the page.
+ */
+function ConfidentialBalanceSection({
+  token,
+  account,
+}: {
+  token: `0x${string}`;
+  account: `0x${string}`;
+}) {
+  const balance = useConfidentialBalance(
+    { address: token, account },
+    { retry: false }
+  );
+
+  return (
+    <section className="panel mt-10 p-6">
+      <h2 className="font-display text-lg">Your confidential balance</h2>
+      <p className="mt-1 font-data text-xs" style={{ color: "var(--text-faint)" }}>
+        Token {token} · account {account}
+      </p>
 
           <div className="mt-6">
             {balance.isLoading && (
@@ -183,21 +202,14 @@ export function VerifyPanel({ initialToken }: VerifyPanelProps) {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => balance.refetch()}
-            disabled={balance.isFetching}
-            className="btn btn-ghost mt-5"
-          >
-            {balance.isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-        </section>
-      )}
-
-      <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
-        Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer — the plaintext
-        balance never leaves your browser.
-      </p>
-    </div>
+      <button
+        type="button"
+        onClick={() => balance.refetch()}
+        disabled={balance.isFetching}
+        className="btn btn-ghost mt-5"
+      >
+        {balance.isFetching ? "Refreshing…" : "Refresh"}
+      </button>
+    </section>
   );
 }
