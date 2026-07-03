@@ -58,7 +58,7 @@ export default function RootLayout({
         {/* Stamp data-theme before first paint to avoid a light/dark flash. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="min-h-full flex flex-col antialiased">
+      <body className="min-h-full flex flex-col antialiased" suppressHydrationWarning>
         <Providers>
           <NavBar />
           <main className="flex flex-1 flex-col">{children}</main>
