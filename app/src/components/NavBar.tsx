@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { ConnectButton } from "@/components/ConnectButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const links = [
   { href: "/guide", label: "Guide" },
@@ -23,7 +24,7 @@ export function NavBar() {
       className="sticky top-0 z-40 border-b"
       style={{
         borderColor: "var(--line)",
-        background: "rgba(11,13,16,0.82)",
+        background: "var(--header-bg)",
         backdropFilter: "blur(10px)",
       }}
     >
@@ -34,7 +35,7 @@ export function NavBar() {
           className="font-display text-lg tracking-tight"
           style={{ color: "var(--text)" }}
         >
-          Blind<span style={{ color: "var(--seal-bright)" }}>Drop</span>
+          Blind<span style={{ color: "var(--seal)" }}>Drop</span>
         </Link>
         <div className="hidden items-center gap-1 sm:flex">
           {links.map((link) => {
@@ -59,6 +60,7 @@ export function NavBar() {
           })}
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle className="hidden sm:inline-flex" />
           <ConnectButton />
           <button
             type="button"
@@ -96,6 +98,12 @@ export function NavBar() {
                 </Link>
               );
             })}
+            <div className="mt-2 flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--line)" }}>
+              <span className="font-data text-xs uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>
+                Theme
+              </span>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       )}

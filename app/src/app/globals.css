@@ -6,43 +6,65 @@
    ============================================================ */
 
 :root {
-  /* ground */
-  --ink: #0b0d10;
-  --ink-1: #101317;
-  --ink-2: #15181d;
-  --ink-3: #1b1f25;
+  /* ============================================================
+     LIGHT THEME (default tokens) — "daylight reading room"
+     Aged-paper / manila ground, typewriter-ink text, same wax
+     seal crimson (deepened for AA contrast), gold foil darkened
+     to bronze so it reads as text on paper.
+     ============================================================ */
+  color-scheme: light;
+
+  /* ground — aged paper / manila */
+  --ink: #f4efe6;
+  --ink-1: #ede4d1;
+  --ink-2: #e9dfc4;
+  --ink-3: #ddcda3;
 
   /* lines & text */
-  --line: rgba(233, 228, 216, 0.11);
-  --line-strong: rgba(233, 228, 216, 0.22);
-  --text: #ece7da;
-  --text-dim: #97917f;
-  --text-faint: #635e50;
+  --line: rgba(35, 30, 20, 0.14);
+  --line-strong: rgba(35, 30, 20, 0.28);
+  --text: #221d14;
+  --text-dim: #6b6250;
+  --text-faint: #9b9078;
 
-  /* paper accent, used sparingly for "document" panels */
-  --paper: #e8e0cd;
-  --paper-dim: #d7cdb2;
+  /* paper accent — brighter card stock than the manila ground */
+  --paper: #fbf7ee;
+  --paper-dim: #efe6d2;
 
-  /* wax seal (primary confidential-red accent) */
-  --seal: #9c2f3a;
-  --seal-bright: #c2434f;
-  --seal-dim: rgba(156, 47, 58, 0.16);
+  /* wax seal (primary confidential-red accent), deepened for AA on paper */
+  --seal: #8a1f2b;
+  --seal-bright: #a52834;
+  --seal-dim: rgba(138, 31, 43, 0.12);
 
-  /* gold foil (the "unsealed / revealed" accent) */
-  --gold: #c9a227;
-  --gold-bright: #e4bd45;
-  --gold-dim: rgba(201, 162, 39, 0.14);
+  /* gold foil, darkened to bronze so it passes contrast as text on paper */
+  --gold: #7a5c0c;
+  --gold-bright: #97730f;
+  --gold-dim: rgba(122, 92, 12, 0.14);
 
-  /* signal colors */
-  --ok: #7fae6a;
-  --ok-dim: rgba(127, 174, 106, 0.14);
-  --warn: #c98a3a;
-  --warn-dim: rgba(201, 138, 58, 0.14);
-  --err: #c2434f;
-  --err-dim: rgba(194, 67, 79, 0.14);
+  /* signal colors, deepened for paper */
+  --ok: #3f6b2e;
+  --ok-dim: rgba(63, 107, 46, 0.14);
+  --warn: #8a5a12;
+  --warn-dim: rgba(138, 90, 18, 0.14);
+  --err: #8a1f2b;
+  --err-dim: rgba(138, 31, 43, 0.12);
 
-  /* redaction black, deliberately darker than ground */
-  --redact: #030405;
+  /* callout text — legible on the tinted callout backgrounds above */
+  --callout-warn-text: #5c3a08;
+  --callout-err-text: #6e131d;
+  --callout-ok-text: #274a1c;
+  --callout-gold-text: #5c4508;
+
+  /* redaction — literal black bar on paper */
+  --redact: #0c0c0b;
+  --redaction-shimmer: rgba(233, 228, 216, 0.14);
+
+  /* elevation — soft paper shadow, not a glow */
+  --shadow-card: 0 14px 28px -16px rgba(35, 30, 20, 0.32);
+  --shadow-ring-seal: 0 0 0 3px var(--seal-dim);
+
+  /* sticky header backdrop, matches ground with translucency */
+  --header-bg: rgba(244, 239, 230, 0.82);
 
   /* type scale */
   --font-display: var(--font-special-elite);
@@ -63,6 +85,104 @@
   --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ------------------------------------------------------------
+   DARK THEME — the original "Confidential Dossier" ink-black look,
+   unchanged, applied when data-theme="dark" is stamped on <html>.
+   ------------------------------------------------------------ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #0b0d10;
+  --ink-1: #101317;
+  --ink-2: #15181d;
+  --ink-3: #1b1f25;
+
+  --line: rgba(233, 228, 216, 0.11);
+  --line-strong: rgba(233, 228, 216, 0.22);
+  --text: #ece7da;
+  --text-dim: #97917f;
+  --text-faint: #635e50;
+
+  --paper: #e8e0cd;
+  --paper-dim: #d7cdb2;
+
+  --seal: #9c2f3a;
+  --seal-bright: #c2434f;
+  --seal-dim: rgba(156, 47, 58, 0.16);
+
+  --gold: #c9a227;
+  --gold-bright: #e4bd45;
+  --gold-dim: rgba(201, 162, 39, 0.14);
+
+  --ok: #7fae6a;
+  --ok-dim: rgba(127, 174, 106, 0.14);
+  --warn: #c98a3a;
+  --warn-dim: rgba(201, 138, 58, 0.14);
+  --err: #c2434f;
+  --err-dim: rgba(194, 67, 79, 0.14);
+
+  --callout-warn-text: #e7bd85;
+  --callout-err-text: #e2939c;
+  --callout-ok-text: #b7d3a8;
+  --callout-gold-text: #e4bd45;
+
+  --redact: #030405;
+  --redaction-shimmer: rgba(233, 228, 216, 0.08);
+
+  --shadow-card: 0 14px 28px -16px rgba(0, 0, 0, 0.6);
+  --shadow-ring-seal: 0 0 0 3px var(--seal-dim);
+  --header-bg: rgba(11, 13, 16, 0.82);
+}
+
+/* no-JS / pre-hydration fallback: honor OS preference when no explicit
+   choice has been stamped yet by the inline theme script */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --ink: #0b0d10;
+    --ink-1: #101317;
+    --ink-2: #15181d;
+    --ink-3: #1b1f25;
+
+    --line: rgba(233, 228, 216, 0.11);
+    --line-strong: rgba(233, 228, 216, 0.22);
+    --text: #ece7da;
+    --text-dim: #97917f;
+    --text-faint: #635e50;
+
+    --paper: #e8e0cd;
+    --paper-dim: #d7cdb2;
+
+    --seal: #9c2f3a;
+    --seal-bright: #c2434f;
+    --seal-dim: rgba(156, 47, 58, 0.16);
+
+    --gold: #c9a227;
+    --gold-bright: #e4bd45;
+    --gold-dim: rgba(201, 162, 39, 0.14);
+
+    --ok: #7fae6a;
+    --ok-dim: rgba(127, 174, 106, 0.14);
+    --warn: #c98a3a;
+    --warn-dim: rgba(201, 138, 58, 0.14);
+    --err: #c2434f;
+    --err-dim: rgba(194, 67, 79, 0.14);
+
+    --callout-warn-text: #e7bd85;
+    --callout-err-text: #e2939c;
+    --callout-ok-text: #b7d3a8;
+    --callout-gold-text: #e4bd45;
+
+    --redact: #030405;
+    --redaction-shimmer: rgba(233, 228, 216, 0.08);
+
+    --shadow-card: 0 14px 28px -16px rgba(0, 0, 0, 0.6);
+    --shadow-ring-seal: 0 0 0 3px var(--seal-dim);
+    --header-bg: rgba(11, 13, 16, 0.82);
+  }
+}
+
 @theme inline {
   --color-background: var(--ink);
   --color-foreground: var(--text);
@@ -74,17 +194,28 @@
   border-color: var(--line);
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   background: var(--ink);
   color: var(--text);
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   background-image:
-    radial-gradient(circle at 15% 0%, rgba(156, 47, 58, 0.05), transparent 40%),
-    radial-gradient(circle at 85% 15%, rgba(201, 162, 39, 0.04), transparent 45%);
+    radial-gradient(circle at 15% 0%, var(--seal-dim), transparent 40%),
+    radial-gradient(circle at 85% 15%, var(--gold-dim), transparent 45%);
+  transition: background-color var(--dur-med) var(--ease-out), color var(--dur-med) var(--ease-out);
+}
+
+/* light mode: faint paper-fiber texture across the whole ground */
+:root:not([data-theme="dark"]) body {
+  background-image:
+    radial-gradient(circle at 15% 0%, var(--seal-dim), transparent 40%),
+    radial-gradient(circle at 85% 15%, var(--gold-dim), transparent 45%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(35, 30, 20, 0.015) 0px,
+      rgba(35, 30, 20, 0.015) 1px,
+      transparent 1px,
+      transparent 3px
+    );
 }
 
 ::selection {
@@ -263,24 +394,24 @@ body {
   gap: 0.6rem;
 }
 .callout-warn {
-  border-color: rgba(201, 138, 58, 0.35);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
   background: var(--warn-dim);
-  color: #e7bd85;
+  color: var(--callout-warn-text);
 }
 .callout-err {
-  border-color: rgba(194, 67, 79, 0.4);
+  border-color: color-mix(in srgb, var(--err) 45%, transparent);
   background: var(--err-dim);
-  color: #e2939c;
+  color: var(--callout-err-text);
 }
 .callout-ok {
-  border-color: rgba(127, 174, 106, 0.35);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
   background: var(--ok-dim);
-  color: #b7d3a8;
+  color: var(--callout-ok-text);
 }
 .callout-gold {
-  border-color: rgba(201, 162, 39, 0.4);
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
   background: var(--gold-dim);
-  color: var(--gold-bright);
+  color: var(--callout-gold-text);
 }
 /* NOTE: Tailwind v4 wraps its utilities in @layer, and unlayered rules
    (like .callout above) always win the cascade over layered ones —
@@ -317,7 +448,7 @@ body {
   border-color: var(--seal-bright);
   color: var(--paper);
   background: radial-gradient(circle at 35% 30%, var(--seal-bright), var(--seal));
-  box-shadow: 0 0 0 3px var(--seal-dim);
+  box-shadow: var(--shadow-ring-seal);
 }
 .seal-badge[data-state="done"] {
   border-color: var(--gold);
@@ -342,8 +473,8 @@ body {
   background: linear-gradient(
     100deg,
     transparent 0%,
-    rgba(233, 228, 216, 0.08) 45%,
-    rgba(233, 228, 216, 0.08) 55%,
+    var(--redaction-shimmer) 45%,
+    var(--redaction-shimmer) 55%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -419,6 +550,18 @@ body {
   border-color: var(--gold);
   transform: translateY(-1px);
 }
+/* light mode: manila envelope stock — subtle fiber texture, no images */
+:root:not([data-theme="dark"]) .envelope-card {
+  background:
+    repeating-linear-gradient(
+      115deg,
+      rgba(35, 30, 20, 0.025) 0px,
+      rgba(35, 30, 20, 0.025) 1px,
+      transparent 1px,
+      transparent 5px
+    ),
+    linear-gradient(180deg, var(--ink-2), var(--ink-1));
+}
 .envelope-flap {
   position: absolute;
   top: 0;
@@ -460,7 +603,7 @@ body {
   }
   .envelope-card:hover {
     transform: perspective(700px) rotateX(1.5deg) rotateY(-1.5deg) translateY(-2px);
-    box-shadow: 0 14px 28px -16px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--shadow-card);
   }
   .envelope-card::before {
     content: "";

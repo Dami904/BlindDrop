@@ -29,6 +29,20 @@ export const metadata: Metadata = {
     "Confidential airdrops on Zama FHEVM via TokenOps — amounts encrypted end-to-end, recipient list never published on-chain.",
 };
 
+const themeInitScript = `
+(function () {
+  try {
+    var stored = window.localStorage.getItem("blinddrop:theme");
+    var theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  } catch (e) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,8 +51,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${specialElite.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased dark`}
+      suppressHydrationWarning
+      className={`${specialElite.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Stamp data-theme before first paint to avoid a light/dark flash. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col antialiased">
         <Providers>
           <NavBar />

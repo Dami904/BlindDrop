@@ -151,7 +151,7 @@ function VerifyContent() {
             {balance.isError && <div className="callout callout-err">{describeDecryptError(balance.error)}</div>}
 
             {balance.isSuccess && (
-              <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "rgba(201,162,39,0.4)", background: "var(--gold-dim)" }}>
+              <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "color-mix(in srgb, var(--gold) 40%, transparent)", background: "var(--gold-dim)" }}>
                 <p className="eyebrow">Seal broken — decrypted balance</p>
                 <p className="font-display tabular mt-1 text-3xl" style={{ color: "var(--gold-bright)" }}>
                   {formatConfidentialAmount(balance.data)}

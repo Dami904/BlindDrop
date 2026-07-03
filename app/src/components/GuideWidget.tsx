@@ -117,7 +117,7 @@ export function GuideWidget() {
                 ?
               </span>
               <div>
-                <p className="font-display text-sm" style={{ color: "var(--gold-bright)" }}>
+                <p className="font-display text-sm" style={{ color: "var(--gold)" }}>
                   The Archivist
                 </p>
                 <p className="font-data text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
@@ -163,7 +163,7 @@ export function GuideWidget() {
                   className="btn btn-ghost"
                   style={
                     script.step === s.step
-                      ? { borderColor: "var(--gold)", color: "var(--gold-bright)" }
+                      ? { borderColor: "var(--gold)", color: "var(--gold)" }
                       : undefined
                   }
                   aria-current={script.step === s.step ? "step" : undefined}
