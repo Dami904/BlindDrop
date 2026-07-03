@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Address } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
@@ -17,6 +17,7 @@ import {
 } from "@tokenops/sdk/fhe-disperse/react";
 import { getConfidentialTestTokenAddress } from "@tokenops/sdk";
 import { DisperseRecipients } from "@/components/disperse/DisperseRecipients";
+import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 import {
   newRecipientEntry,
   scaleAmountToUnits,
@@ -30,6 +31,64 @@ const CONFIDENTIAL_DECIMALS = 6;
 
 function isHexAddress(value: string): value is Address {
   return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
+}
+
+type SectionState = "idle" | "active" | "done";
+
+/**
+ * One numbered section of the disperse flow: a wax-seal step marker,
+ * title, and one-line summary shown once the section is complete and
+ * collapsed. Auto-collapses on completion; the visitor can re-expand any
+ * section (done or not) to review or edit it.
+ */
+function Section({
+  n,
+  title,
+  state,
+  summary,
+  open,
+  onOpenChange,
+  children,
+}: {
+  n: number;
+  title: string;
+  state: SectionState;
+  summary?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="panel mt-8">
+      <Collapsible
+        open={open}
+        onOpenChange={onOpenChange}
+        triggerClassName="flex w-full items-center justify-between gap-4 p-6 text-left"
+        trigger={
+          <>
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="seal-badge shrink-0" data-state={state === "idle" ? undefined : state}>
+                {state === "done" ? "✓" : n}
+              </span>
+              <span className="min-w-0">
+                <span className="font-display block text-lg">{title}</span>
+                {!open && summary && (
+                  <span className="mt-0.5 block truncate text-xs" style={{ color: "var(--text-dim)" }}>
+                    {summary}
+                  </span>
+                )}
+              </span>
+            </span>
+            <span className="shrink-0" style={{ color: "var(--text-dim)" }}>
+              <ChevronIcon open={open} />
+            </span>
+          </>
+        }
+      >
+        <div className="px-6 pb-6">{children}</div>
+      </Collapsible>
+    </section>
+  );
 }
 
 export default function DispersePage() {
@@ -94,11 +153,21 @@ export default function DispersePage() {
     !!preflight.data?.ready &&
     !disperse.isPending;
 
-  const prereqSteps = [
-    { label: "Register your wallet pair", done: isRegistered.data === true },
-    { label: "Approve token operator", done: approvals.data?.both === true },
-    { label: "Disperse", done: disperse.isSuccess },
-  ];
+  // Section 1: setup (token + recipients). "Done" once there's a valid
+  // token and at least one valid recipient — matches the gating that
+  // previously revealed the prerequisites checklist.
+  const setupDone = ready && !!token && recipients.length > 0;
+  const registeredDone = isRegistered.data === true;
+  const approvedDone = approvals.data?.both === true;
+  const disperseDone = disperse.isSuccess;
+
+  const [openOverrides, setOpenOverrides] = useState<Record<number, boolean>>({});
+  function sectionOpen(n: number, doneByDefault: boolean) {
+    return openOverrides[n] ?? !doneByDefault;
+  }
+  function setSectionOpen(n: number, open: boolean) {
+    setOpenOverrides((o) => ({ ...o, [n]: open }));
+  }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
@@ -127,148 +196,154 @@ export default function DispersePage() {
         </div>
       )}
 
-      <section className="mt-8 space-y-3">
-        <label className="label">ERC-7984 confidential token address</label>
-        <input
-          value={tokenInput}
-          onChange={(e) => setTokenInput(e.target.value)}
-          placeholder="0x…"
-          className="field font-data"
-        />
-        {!tokenValid && tokenInput.length > 0 && (
-          <p className="text-xs" style={{ color: "var(--err)" }}>
-            Not a valid address.
+      <Section
+        n={1}
+        title="Token & recipients"
+        state={setupDone ? "done" : "active"}
+        summary={
+          setupDone
+            ? `${recipients.length} recipient${recipients.length === 1 ? "" : "s"} · token ${tokenInput.slice(0, 6)}…${tokenInput.slice(-4)}`
+            : undefined
+        }
+        open={sectionOpen(1, setupDone)}
+        onOpenChange={(o) => setSectionOpen(1, o)}
+      >
+        <div className="space-y-3">
+          <label className="label">ERC-7984 confidential token address</label>
+          <input
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+            placeholder="0x…"
+            className="field font-data"
+          />
+          {!tokenValid && tokenInput.length > 0 && (
+            <p className="text-xs" style={{ color: "var(--err)" }}>
+              Not a valid address.
+            </p>
+          )}
+          <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+            Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
+            <Link href="/#faucet" className="link-gold">
+              Claim some →
+            </Link>
           </p>
-        )}
-        <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-          Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
-          <Link href="/#faucet" className="link-gold">
-            Claim some →
-          </Link>
-        </p>
-      </section>
-
-      <section className="panel mt-8 p-6">
-        <h2 className="font-display text-lg">Recipients</h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
-          Upload a CSV, paste rows, or add recipients manually. Format:{" "}
-          <code className="font-data" style={{ color: "var(--text)" }}>
-            address,amount
-          </code>{" "}
-          per line.
-        </p>
-        <div className="mt-4">
-          <DisperseRecipients entries={entries} onChange={setEntries} validated={validated} />
         </div>
-      </section>
+
+        <div className="divider-stamped mt-6 pt-6">
+          <h3 className="eyebrow">Recipients</h3>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+            Upload a CSV, paste rows, or add recipients manually. Format:{" "}
+            <code className="font-data" style={{ color: "var(--text)" }}>
+              address,amount
+            </code>{" "}
+            per line.
+          </p>
+          <div className="mt-4">
+            <DisperseRecipients entries={entries} onChange={setEntries} validated={validated} />
+          </div>
+        </div>
+      </Section>
 
       {ready && token && (
-        <section className="panel mt-6 p-6">
-          <h2 className="eyebrow mb-4">Prerequisites checklist</h2>
-          <ol className="flex flex-col gap-6">
-            <li>
-              <div className="flex items-center gap-3">
-                <span className="seal-badge" data-state={prereqSteps[0].done ? "done" : "active"}>
-                  {prereqSteps[0].done ? "✓" : "1"}
-                </span>
-                <h3 className="font-display text-base">Register your wallet pair</h3>
-              </div>
-              <p className="mt-1 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
-                One-time setup: the disperse singleton deploys a dedicated wallet pair for your
-                address to hold funds mid-transfer.
+        <>
+          <Section
+            n={2}
+            title="Register your wallet pair"
+            state={registeredDone ? "done" : "active"}
+            summary={registeredDone ? "Registered" : undefined}
+            open={sectionOpen(2, registeredDone)}
+            onOpenChange={(o) => setSectionOpen(2, o)}
+          >
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              One-time setup: the disperse singleton deploys a dedicated wallet pair for your
+              address to hold funds mid-transfer.
+            </p>
+            <button
+              type="button"
+              onClick={() => register.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
+              disabled={registeredDone || register.isPending}
+              className="btn btn-seal mt-3"
+            >
+              {registeredDone ? "Registered" : register.isPending ? "Registering…" : "Register"}
+            </button>
+            {register.isError && (
+              <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
+                {register.error?.message}
               </p>
-              <div className="ml-10">
-                <button
-                  type="button"
-                  onClick={() => register.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
-                  disabled={isRegistered.data === true || register.isPending}
-                  className="btn btn-seal mt-3"
-                >
-                  {isRegistered.data === true ? "Registered" : register.isPending ? "Registering…" : "Register"}
-                </button>
-                {register.isError && (
-                  <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
-                    {register.error?.message}
-                  </p>
-                )}
-              </div>
-            </li>
+            )}
+          </Section>
 
-            <li>
-              <div className="flex items-center gap-3">
-                <span className="seal-badge" data-state={prereqSteps[1].done ? "done" : isRegistered.data === true ? "active" : undefined}>
-                  {prereqSteps[1].done ? "✓" : "2"}
-                </span>
-                <h3 className="font-display text-base">Approve token operator</h3>
-              </div>
-              <p className="mt-1 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
-                Your registered wallets must be approved as ERC-7984 operators for this token
-                before a wallet-mode disperse can move funds.
+          <Section
+            n={3}
+            title="Approve token operator"
+            state={approvedDone ? "done" : registeredDone ? "active" : "idle"}
+            summary={approvedDone ? "Approved" : undefined}
+            open={sectionOpen(3, approvedDone)}
+            onOpenChange={(o) => setSectionOpen(3, o)}
+          >
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              Your registered wallets must be approved as ERC-7984 operators for this token
+              before a wallet-mode disperse can move funds.
+            </p>
+            <button
+              type="button"
+              onClick={() => approve.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
+              disabled={!registeredDone || approvedDone || approve.isPending}
+              className="btn btn-seal mt-3"
+            >
+              {approvedDone ? "Approved" : approve.isPending ? "Approving…" : "Approve operator"}
+            </button>
+            {approve.isError && (
+              <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
+                {approve.error?.message}
               </p>
-              <div className="ml-10">
-                <button
-                  type="button"
-                  onClick={() => approve.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
-                  disabled={isRegistered.data !== true || approvals.data?.both === true || approve.isPending}
-                  className="btn btn-seal mt-3"
-                >
-                  {approvals.data?.both === true ? "Approved" : approve.isPending ? "Approving…" : "Approve operator"}
-                </button>
-                {approve.isError && (
-                  <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
-                    {approve.error?.message}
-                  </p>
-                )}
-              </div>
-            </li>
+            )}
+          </Section>
 
-            <li>
-              <div className="flex items-center gap-3">
-                <span className="seal-badge" data-state={prereqSteps[2].done ? "done" : approvals.data?.both === true ? "active" : undefined}>
-                  {prereqSteps[2].done ? "✓" : "3"}
-                </span>
-                <h3 className="font-display text-base">Disperse</h3>
-              </div>
+          <Section
+            n={4}
+            title="Disperse"
+            state={disperseDone ? "done" : approvedDone ? "active" : "idle"}
+            summary={disperseDone && disperse.data ? `Sent · ${disperse.data.hash.slice(0, 10)}…` : undefined}
+            open={sectionOpen(4, disperseDone)}
+            onOpenChange={(o) => setSectionOpen(4, o)}
+          >
+            {preflight.data && !preflight.data.ready && preflight.data.blockerErrors.length > 0 && (
+              <ul className="mb-3 list-inside list-disc space-y-0.5 text-xs" style={{ color: "var(--warn)" }}>
+                {preflight.data.blockerErrors.map((err, i) => (
+                  <li key={i}>{err.message}</li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                disperse.mutate(
+                  { token, mode: "wallet", recipients, amounts },
+                  { onSuccess: invalidateDisperseQueries }
+                )
+              }
+              disabled={!canSubmit}
+              className="btn btn-gold"
+            >
+              {disperse.isPending ? "Dispersing…" : "Disperse tokens"}
+            </button>
 
-              <div className="ml-10">
-                {preflight.data && !preflight.data.ready && preflight.data.blockerErrors.length > 0 && (
-                  <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs" style={{ color: "var(--warn)" }}>
-                    {preflight.data.blockerErrors.map((err, i) => (
-                      <li key={i}>{err.message}</li>
-                    ))}
-                  </ul>
-                )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    disperse.mutate(
-                      { token, mode: "wallet", recipients, amounts },
-                      { onSuccess: invalidateDisperseQueries }
-                    )
-                  }
-                  disabled={!canSubmit}
-                  className="btn btn-gold mt-3"
-                >
-                  {disperse.isPending ? "Dispersing…" : "Disperse tokens"}
-                </button>
-
-                {disperse.isSuccess && disperse.data && (
-                  <div className="callout callout-ok mt-3 text-xs">
-                    Dispersed. Tx:{" "}
-                    <a href={etherscanTxUrl(disperse.data.hash)} target="_blank" rel="noreferrer" className="font-data underline">
-                      {disperse.data.hash.slice(0, 10)}…
-                    </a>
-                  </div>
-                )}
-                {disperse.isError && (
-                  <p className="callout callout-err mt-3 text-xs">
-                    {disperse.error?.message ?? "Disperse failed."}
-                  </p>
-                )}
+            {disperse.isSuccess && disperse.data && (
+              <div className="callout callout-ok mt-3 text-xs">
+                Dispersed. Tx:{" "}
+                <a href={etherscanTxUrl(disperse.data.hash)} target="_blank" rel="noreferrer" className="font-data underline">
+                  {disperse.data.hash.slice(0, 10)}…
+                </a>
               </div>
-            </li>
-          </ol>
-        </section>
+            )}
+            {disperse.isError && (
+              <p className="callout callout-err mt-3 text-xs">
+                {disperse.error?.message ?? "Disperse failed."}
+              </p>
+            )}
+          </Section>
+        </>
       )}
     </div>
   );

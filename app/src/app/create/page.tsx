@@ -37,7 +37,7 @@ export default function CreatePage() {
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>
 
-      <ol className="mt-8 flex items-center gap-3 text-sm">
+      <ol className="mt-10 flex items-center gap-3 text-sm">
         {STEPS.map((s, i) => {
           const state = step === s.id ? "active" : s.id < step ? "done" : undefined;
           const reachable =
@@ -66,7 +66,7 @@ export default function CreatePage() {
         })}
       </ol>
 
-      <div className="panel mt-8 p-6">
+      <div className="panel mt-10 p-8">
         {step === 1 && (
           <RecipientsStep entries={entries} onChange={setEntries} onNext={() => setStep(2)} />
         )}

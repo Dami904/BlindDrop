@@ -71,8 +71,13 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h2 className="font-display text-lg">I. Recipients</h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+        <div className="flex items-center gap-3">
+          <span className="seal-badge" data-state="active">
+            1
+          </span>
+          <h2 className="font-display text-lg">Recipients</h2>
+        </div>
+        <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
           Upload a CSV, paste rows, or add recipients manually below. Format:{" "}
           <code className="font-data" style={{ color: "var(--text)" }}>
             address,amount
@@ -107,7 +112,10 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
             <div>
               <label className="label">CSV upload</label>
               <p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>
-                One recipient per line: <code className="font-data">0xabc...,10</code>
+                One recipient per line: <code className="font-data">0xabc...,10</code>{" "}
+                <a href="/recipients-template.csv" download className="link-gold">
+                  Download CSV template
+                </a>
               </p>
               <input
                 ref={fileInputRef}

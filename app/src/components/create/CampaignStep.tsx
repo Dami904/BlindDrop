@@ -151,10 +151,15 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div>
-        <h2 className="font-display text-lg">II. Campaign</h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+        <div className="flex items-center gap-3">
+          <span className="seal-badge" data-state="active">
+            2
+          </span>
+          <h2 className="font-display text-lg">Campaign</h2>
+        </div>
+        <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
           Configure the token and claim window, then deploy the airdrop clone.
         </p>
       </div>

@@ -118,10 +118,15 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div>
-        <h2 className="font-display text-lg">III. Claim packets</h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+        <div className="flex items-center gap-3">
+          <span className="seal-badge" data-state="active">
+            3
+          </span>
+          <h2 className="font-display text-lg">Claim packets</h2>
+        </div>
+        <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
           For each recipient, an encrypted allocation is sealed to their address, then
           admin-signed. This runs sequentially and can take a while — each step is a real FHE
           encryption + relayer round-trip. Nothing is sent to a server; packets stay in your browser.

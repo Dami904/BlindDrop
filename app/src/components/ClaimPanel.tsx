@@ -60,6 +60,8 @@ function describeClaimError(error: unknown): string {
 export interface ClaimPanelProps {
   /** Called once, right after a claim transaction succeeds, with the confidential token address. */
   onClaimed?: (token: string) => void;
+  /** Called once a claim packet has been successfully loaded (file, drop, or paste). */
+  onPacketLoaded?: () => void;
 }
 
 /**
@@ -67,7 +69,7 @@ export interface ClaimPanelProps {
  * /claim page so it can sit as the first section of the merged
  * "Claim & Verify" page, alongside {@link VerifyPanel}.
  */
-export function ClaimPanel({ onClaimed }: ClaimPanelProps) {
+export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
@@ -92,7 +94,8 @@ export function ClaimPanel({ onClaimed }: ClaimPanelProps) {
       return;
     }
     setLoadState({ kind: "loaded", packet: result.packet });
-  }, []);
+    onPacketLoaded?.();
+  }, [onPacketLoaded]);
 
   const onFileChange = useCallback(
     async (file: File | undefined) => {

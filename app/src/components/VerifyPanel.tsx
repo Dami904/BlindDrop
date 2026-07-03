@@ -59,6 +59,8 @@ export interface VerifyPanelProps {
    * (after a successful claim) re-fills and re-submits the form.
    */
   initialToken?: string;
+  /** Called once a confidential balance has been successfully decrypted. */
+  onVerified?: () => void;
 }
 
 /**
@@ -67,7 +69,7 @@ export interface VerifyPanelProps {
  * standalone /verify page so it can live as the second section of
  * /claim ("Claim & Verify").
  */
-export function VerifyPanel({ initialToken }: VerifyPanelProps) {
+export function VerifyPanel({ initialToken, onVerified }: VerifyPanelProps) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
 
@@ -135,7 +137,7 @@ export function VerifyPanel({ initialToken }: VerifyPanelProps) {
       </section>
 
       {submittedToken && address && isConnected && !wrongChain && (
-        <ConfidentialBalanceSection token={submittedToken} account={address} />
+        <ConfidentialBalanceSection token={submittedToken} account={address} onVerified={onVerified} />
       )}
 
       <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
@@ -155,14 +157,21 @@ export function VerifyPanel({ initialToken }: VerifyPanelProps) {
 function ConfidentialBalanceSection({
   token,
   account,
+  onVerified,
 }: {
   token: `0x${string}`;
   account: `0x${string}`;
+  onVerified?: () => void;
 }) {
   const balance = useConfidentialBalance(
     { address: token, account },
     { retry: false }
   );
+
+  useEffect(() => {
+    if (balance.isSuccess) onVerified?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balance.isSuccess]);
 
   return (
     <section className="panel mt-10 p-6">

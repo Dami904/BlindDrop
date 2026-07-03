@@ -67,8 +67,9 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
       return;
     }
 
-    if (!isValidPositiveAmount(amountRaw)) {
-      errors.push({ line, raw: rawLine, message: `Invalid amount: ${amountRaw}` });
+    const amountError = describeAmountError(amountRaw);
+    if (amountError) {
+      errors.push({ line, raw: rawLine, message: amountError });
       return;
     }
 
@@ -86,11 +87,28 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
   return { rows, errors, duplicates };
 }
 
+/** ERC-7984 confidential tokens use 6 decimals — amounts may not be more precise. */
+export const MAX_AMOUNT_DECIMALS = 6;
+
 /** True when `value` is a finite, positive decimal number (e.g. "1", "0.5", "12.345678"). */
 export function isValidPositiveAmount(value: string): boolean {
   if (!/^\d+(\.\d+)?$/.test(value)) return false;
   const n = Number(value);
   return Number.isFinite(n) && n > 0;
+}
+
+/**
+ * Returns an error message when `value` is not a usable token amount, or
+ * undefined when it is. Rejects precision beyond {@link MAX_AMOUNT_DECIMALS}
+ * outright — silently truncating extra digits would under-credit a recipient.
+ */
+export function describeAmountError(value: string): string | undefined {
+  if (!isValidPositiveAmount(value)) return `Invalid amount: ${value || "(empty)"}`;
+  const frac = value.split(".")[1] ?? "";
+  if (frac.length > MAX_AMOUNT_DECIMALS) {
+    return `Too precise: ${value} — amounts support at most ${MAX_AMOUNT_DECIMALS} decimal places`;
+  }
+  return undefined;
 }
 
 /**
@@ -135,8 +153,9 @@ export function validateRecipientEntries(entries: RecipientEntry[]): ValidatedRe
       errorsById[entry.id] = `Invalid address: ${address || "(empty)"}`;
       return;
     }
-    if (!isValidPositiveAmount(amount)) {
-      errorsById[entry.id] = `Invalid amount: ${amount || "(empty)"}`;
+    const amountError = describeAmountError(amount);
+    if (amountError) {
+      errorsById[entry.id] = amountError;
       return;
     }
 
@@ -169,7 +188,13 @@ export function newRecipientEntry(): RecipientEntry {
  */
 export function scaleAmountToUnits(amount: string, decimals: number): bigint {
   const [whole, frac = ""] = amount.split(".");
-  const fracPadded = (frac + "0".repeat(decimals)).slice(0, decimals);
+  if (frac.length > decimals) {
+    // Never silently truncate — dropping digits would under-credit the recipient.
+    throw new RangeError(
+      `Amount ${amount} has more than ${decimals} decimal places; validate with describeAmountError first`
+    );
+  }
+  const fracPadded = frac.padEnd(decimals, "0");
   const combined = `${whole}${fracPadded}`.replace(/^0+(?=\d)/, "");
   return BigInt(combined || "0");
 }

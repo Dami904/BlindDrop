@@ -65,7 +65,12 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="panel p-4">
-          <label className="label">CSV upload</label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="label">CSV upload</label>
+            <a href="/recipients-template.csv" download className="link-gold text-xs">
+              Download CSV template
+            </a>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
