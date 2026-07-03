@@ -14,7 +14,7 @@ export function NavBar() {
     <header className="border-b border-zinc-800 bg-black/40 backdrop-blur">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="text-lg font-semibold tracking-tight text-zinc-50">
-          Shield<span className="text-emerald-400">Drop</span>
+          Blind<span className="text-emerald-400">Drop</span>
         </Link>
         <div className="hidden items-center gap-6 sm:flex">
           {links.map((link) => (
