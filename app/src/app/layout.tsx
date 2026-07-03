@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Special_Elite, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Unbounded, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { NavBar } from "@/components/NavBar";
 import { GuideWidget } from "@/components/GuideWidget";
 
-const specialElite = Special_Elite({
-  variable: "--font-special-elite",
+const unbounded = Unbounded({
+  variable: "--font-unbounded",
   subsets: ["latin"],
-  weight: "400",
+  weight: ["500", "600", "700", "800"],
 });
 
 const plexSans = IBM_Plex_Sans({
@@ -52,7 +52,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${specialElite.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${unbounded.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <head>
         {/* Stamp data-theme before first paint to avoid a light/dark flash. */}

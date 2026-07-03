@@ -141,7 +141,7 @@ function VerifyContent() {
           <div className="mt-6">
             {balance.isLoading && (
               <div className="flex items-center gap-3">
-                <span className="redaction inline-block h-9 w-40 rounded" />
+                <span className="fhe-scan inline-block h-9 w-40 rounded-[var(--r-sm)]" />
                 <p className="text-xs" style={{ color: "var(--text-dim)" }}>
                   Requesting your decryption signature and reaching the relayer…
                 </p>
@@ -151,9 +151,18 @@ function VerifyContent() {
             {balance.isError && <div className="callout callout-err">{describeDecryptError(balance.error)}</div>}
 
             {balance.isSuccess && (
-              <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "color-mix(in srgb, var(--gold) 40%, transparent)", background: "var(--gold-dim)" }}>
-                <p className="eyebrow">Seal broken — decrypted balance</p>
-                <p className="font-display tabular mt-1 text-3xl" style={{ color: "var(--gold-bright)" }}>
+              <div
+                className="unseal-enter unseal-bloom rounded-[var(--r-lg)] border px-6 py-5"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--gold) 45%, transparent)",
+                  background: "var(--gold-dim)",
+                  boxShadow: "var(--glow-gold)",
+                }}
+              >
+                <p className="eyebrow" style={{ color: "var(--gold)" }}>
+                  Seal broken — decrypted balance
+                </p>
+                <p className="font-display tabular mt-1 text-3xl sm:text-4xl" style={{ color: "var(--gold-bright)" }}>
                   {formatConfidentialAmount(balance.data)}
                 </p>
                 <p className="font-data mt-1 text-xs" style={{ color: "var(--text-dim)" }}>
