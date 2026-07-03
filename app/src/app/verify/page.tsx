@@ -14,6 +14,7 @@ import {
   ZamaError,
 } from "@zama-fhe/sdk";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID } from "@/lib/packet";
+import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -82,27 +83,31 @@ function VerifyContent() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <h1 className="text-3xl font-semibold text-zinc-50">Verify &amp; Decrypt My Allocation</h1>
-      <p className="mt-3 text-zinc-400">
+      <p className="eyebrow">The unsealing</p>
+      <h1 className="font-display mt-2 text-3xl">Verify &amp; Decrypt My Allocation</h1>
+      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Read your confidential ERC-7984 balance and decrypt it locally via the Zama relayer. Only
         the connected wallet can decrypt its own balance — no one else, including this app, can see
         the plaintext amount.
       </p>
 
-      {!isConnected && (
-        <div className="mt-8 rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
-          Connect your wallet to verify a balance.
-        </div>
-      )}
+      <OnboardingHint
+        step={5}
+        total={5}
+        title="Last step of the journey"
+        body="Your wallet signs a request the relayer uses to decrypt just your own balance — the plaintext number never leaves your browser."
+      />
+
+      {!isConnected && <div className="callout callout-warn mt-8">Connect your wallet to verify a balance.</div>}
 
       {isConnected && wrongChain && (
-        <div className="mt-8 flex items-center justify-between rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+        <div className="callout callout-warn callout-between mt-8">
           <span>Switch to Sepolia (chain {SEPOLIA_CHAIN_ID}) to read confidential balances.</span>
           <button
             type="button"
             onClick={() => switchChain({ chainId: sepolia.id })}
             disabled={isSwitching}
-            className="ml-4 shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-gold ml-4 shrink-0 text-xs"
           >
             {isSwitching ? "Switching…" : "Switch to Sepolia"}
           </button>
@@ -110,65 +115,65 @@ function VerifyContent() {
       )}
 
       <section className="mt-8 space-y-3">
-        <label className="block text-sm font-medium text-zinc-300">
-          ERC-7984 confidential token address
-        </label>
+        <label className="label">ERC-7984 confidential token address</label>
         <div className="flex gap-2">
           <input
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
             placeholder="0x…"
-            className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none"
+            className="field font-data"
           />
           <button
             type="button"
             disabled={!tokenValid}
             onClick={() => setSubmittedToken(tokenInput.trim() as `0x${string}`)}
-            className="shrink-0 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-seal shrink-0"
           >
             Decrypt balance
           </button>
         </div>
         {tokenInput && !tokenValid && (
-          <p className="text-xs text-red-400">That doesn&apos;t look like a valid contract address.</p>
+          <p className="text-xs" style={{ color: "var(--err)" }}>
+            That doesn&apos;t look like a valid contract address.
+          </p>
         )}
       </section>
 
       {submittedToken && isConnected && !wrongChain && (
-        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-          <h2 className="text-lg font-semibold text-zinc-50">Your confidential balance</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Token <span className="font-mono">{submittedToken}</span> · account{" "}
-            <span className="font-mono">{address}</span>
+        <section className="panel mt-10 p-6">
+          <h2 className="font-display text-lg">Your confidential balance</h2>
+          <p className="mt-1 font-data text-xs" style={{ color: "var(--text-faint)" }}>
+            Token {submittedToken} · account {address}
           </p>
 
           <div className="mt-6">
             {balance.isLoading && (
-              <p className="text-sm text-zinc-400">
-                Reading encrypted balance and requesting a decryption signature from your wallet…
-              </p>
-            )}
-
-            {balance.isError && (
-              <div className="rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-                {describeDecryptError(balance.error)}
+              <div className="flex items-center gap-3">
+                <span className="redaction inline-block h-9 w-40 rounded" />
+                <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+                  Requesting your decryption signature and reaching the relayer…
+                </p>
               </div>
             )}
 
+            {balance.isError && <div className="callout callout-err">{describeDecryptError(balance.error)}</div>}
+
             {balance.isSuccess && (
-              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-6 py-5">
-                <p className="text-xs uppercase tracking-wide text-emerald-400">Decrypted balance</p>
-                <p className="mt-1 text-3xl font-semibold text-emerald-100">
+              <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "rgba(201,162,39,0.4)", background: "var(--gold-dim)" }}>
+                <p className="eyebrow">Seal broken — decrypted balance</p>
+                <p className="font-display tabular mt-1 text-3xl" style={{ color: "var(--gold-bright)" }}>
                   {formatConfidentialAmount(balance.data)}
                 </p>
-                <p className="mt-1 text-xs text-emerald-400/70">
+                <p className="font-data mt-1 text-xs" style={{ color: "var(--text-dim)" }}>
                   Raw units: {balance.data.toString()} ({CONFIDENTIAL_DECIMALS} decimals)
                 </p>
               </div>
             )}
 
             {!balance.isLoading && !balance.isError && !balance.isSuccess && (
-              <p className="text-sm text-zinc-500">No balance loaded yet.</p>
+              <p className="text-sm" style={{ color: "var(--text-faint)" }}>
+                No balance loaded yet.
+              </p>
             )}
           </div>
 
@@ -176,14 +181,14 @@ function VerifyContent() {
             type="button"
             onClick={() => balance.refetch()}
             disabled={balance.isFetching}
-            className="mt-5 rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-ghost mt-5"
           >
             {balance.isFetching ? "Refreshing…" : "Refresh"}
           </button>
         </section>
       )}
 
-      <p className="mt-10 text-xs text-zinc-600">
+      <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
         Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer — the plaintext
         balance never leaves your browser.
       </p>

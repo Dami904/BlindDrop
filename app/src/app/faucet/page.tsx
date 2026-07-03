@@ -11,6 +11,7 @@ import {
   useMintUnderlying,
 } from "@tokenops/sdk/testnet-faucet/react";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
+import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CTTT_MINT_AMOUNT = BigInt(1_000_000_000); // 1,000 CTTT (6-decimal units)
 const TTT_MINT_AMOUNT = BigInt(1_000) * BigInt(10) ** BigInt(18); // 1,000 TTT (18-decimal units)
@@ -39,66 +40,72 @@ export default function FaucetPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <h1 className="text-3xl font-semibold text-zinc-50">Testnet Faucet</h1>
-      <p className="mt-3 text-zinc-400">
+      <p className="eyebrow">Step one</p>
+      <h1 className="font-display mt-2 text-3xl">Testnet Faucet</h1>
+      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Claim the TokenOps test-token pair on Sepolia — TTT (plain ERC-20) and CTTT (its
         ERC-7984 confidential wrapper) — so judges can go from zero to a full confidential
         distribution demo in minutes.
       </p>
 
+      <OnboardingHint
+        step={1}
+        total={5}
+        title="Start here"
+        body="Mint test tokens first — a confidential distribution needs a funded, encrypted token balance to draw from."
+        nextHref="/create"
+        nextLabel="Then create a distribution"
+      />
+
       {!isConnected && (
-        <div className="mt-8 rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
-          Connect your wallet to claim test tokens.
-        </div>
+        <div className="callout callout-warn mt-8">Connect your wallet to claim test tokens.</div>
       )}
 
       {isConnected && wrongChain && (
-        <div className="mt-8 flex items-center justify-between rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+        <div className="callout callout-warn callout-between mt-8">
           <span>Switch to Sepolia (chain {SEPOLIA_CHAIN_ID}) to use the faucet.</span>
           <button
             type="button"
             onClick={() => switchChain({ chainId: sepolia.id })}
             disabled={isSwitching}
-            className="ml-4 shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-gold ml-4 shrink-0 text-xs"
           >
             {isSwitching ? "Switching…" : "Switch to Sepolia"}
           </button>
         </div>
       )}
 
-      <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
-        <h2 className="text-lg font-medium text-zinc-100">Token addresses</h2>
-        {metaLoading && <p className="mt-2 text-sm text-zinc-500">Loading faucet metadata…</p>}
+      <section className="panel mt-8 p-6">
+        <h2 className="font-display text-lg">Token addresses</h2>
+        {metaLoading && (
+          <p className="mt-3 text-sm" style={{ color: "var(--text-dim)" }}>
+            <span className="redaction inline-block h-4 w-48 rounded align-middle" /> Loading faucet metadata…
+          </p>
+        )}
         {meta && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-              <p className="text-sm font-medium text-zinc-200">
-                {cttt?.symbol} <span className="text-zinc-500">({cttt?.decimals} decimals)</span>
+            <div className="panel p-4">
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                {cttt?.symbol} <span style={{ color: "var(--text-faint)" }}>({cttt?.decimals} decimals)</span>
               </p>
-              <p className="mt-1 break-all font-mono text-xs text-zinc-400">{cttt?.address}</p>
+              <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text-dim)" }}>
+                {cttt?.address}
+              </p>
               {cttt?.address && (
-                <a
-                  href={etherscanAddressUrl(cttt.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300"
-                >
+                <a href={etherscanAddressUrl(cttt.address)} target="_blank" rel="noreferrer" className="link-gold mt-2 inline-block text-xs">
                   View on Etherscan →
                 </a>
               )}
             </div>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-              <p className="text-sm font-medium text-zinc-200">
-                {ttt?.symbol} <span className="text-zinc-500">({ttt?.decimals} decimals)</span>
+            <div className="panel p-4">
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                {ttt?.symbol} <span style={{ color: "var(--text-faint)" }}>({ttt?.decimals} decimals)</span>
               </p>
-              <p className="mt-1 break-all font-mono text-xs text-zinc-400">{ttt?.address}</p>
+              <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text-dim)" }}>
+                {ttt?.address}
+              </p>
               {ttt?.address && (
-                <a
-                  href={etherscanAddressUrl(ttt.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-block text-xs text-emerald-400 hover:text-emerald-300"
-                >
+                <a href={etherscanAddressUrl(ttt.address)} target="_blank" rel="noreferrer" className="link-gold mt-2 inline-block text-xs">
                   View on Etherscan →
                 </a>
               )}
@@ -106,7 +113,7 @@ export default function FaucetPage() {
           </div>
         )}
         {meta && (
-          <p className="mt-4 text-xs text-zinc-500">
+          <p className="mt-4 text-xs" style={{ color: "var(--text-faint)" }}>
             Conversion rate: 1 {cttt?.symbol} unit is backed by {meta.rate.toString()} {ttt?.symbol}{" "}
             base units. Both mints are open and permissionless on Sepolia — no cooldown, any
             amount up to the confidential uint64 ceiling.
@@ -115,9 +122,9 @@ export default function FaucetPage() {
       </section>
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
-          <h3 className="text-base font-medium text-zinc-100">Mint confidential CTTT</h3>
-          <p className="mt-1 text-sm text-zinc-400">
+        <div className="panel p-6">
+          <h3 className="font-display text-base">Mint confidential CTTT</h3>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
             Mint 1,000 CTTT to your wallet, fully backed by freshly minted TTT. The amount is
             public; only your aggregated balance stays confidential.
           </p>
@@ -125,40 +132,30 @@ export default function FaucetPage() {
             type="button"
             onClick={() => {
               setLastAction("confidential");
-              mintConfidential.mutate(
-                { amount: CTTT_MINT_AMOUNT },
-                { onSuccess: invalidateFaucetQueries }
-              );
+              mintConfidential.mutate({ amount: CTTT_MINT_AMOUNT }, { onSuccess: invalidateFaucetQueries });
             }}
             disabled={!ready || mintConfidential.isPending}
-            className="mt-4 rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-seal mt-4"
           >
             {mintConfidential.isPending ? "Minting…" : "Mint 1,000 CTTT"}
           </button>
 
           {lastAction === "confidential" && mintConfidential.isSuccess && mintConfidential.data && (
-            <div className="mt-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
+            <div className="callout callout-ok mt-3 text-xs">
               Minted. Tx:{" "}
-              <a
-                href={etherscanTxUrl(mintConfidential.data.hash)}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-emerald-200"
-              >
+              <a href={etherscanTxUrl(mintConfidential.data.hash)} target="_blank" rel="noreferrer" className="font-data underline">
                 {mintConfidential.data.hash.slice(0, 10)}…
               </a>
             </div>
           )}
           {lastAction === "confidential" && mintConfidential.isError && (
-            <p className="mt-3 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-              {mintConfidential.error?.message ?? "Mint failed."}
-            </p>
+            <p className="callout callout-err mt-3 text-xs">{mintConfidential.error?.message ?? "Mint failed."}</p>
           )}
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
-          <h3 className="text-base font-medium text-zinc-100">Mint plain TTT</h3>
-          <p className="mt-1 text-sm text-zinc-400">
+        <div className="panel p-6">
+          <h3 className="font-display text-base">Mint plain TTT</h3>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
             Mint 1,000 plain ERC-20 TTT — useful if you want to approve + wrap it into CTTT
             yourself via the standard ERC-7984 flow.
           </p>
@@ -166,47 +163,34 @@ export default function FaucetPage() {
             type="button"
             onClick={() => {
               setLastAction("underlying");
-              mintUnderlying.mutate(
-                { amount: TTT_MINT_AMOUNT },
-                { onSuccess: invalidateFaucetQueries }
-              );
+              mintUnderlying.mutate({ amount: TTT_MINT_AMOUNT }, { onSuccess: invalidateFaucetQueries });
             }}
             disabled={!ready || mintUnderlying.isPending}
-            className="mt-4 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-100 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-ghost mt-4"
           >
             {mintUnderlying.isPending ? "Minting…" : "Mint 1,000 TTT"}
           </button>
 
           {lastAction === "underlying" && mintUnderlying.isSuccess && mintUnderlying.data && (
-            <div className="mt-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
+            <div className="callout callout-ok mt-3 text-xs">
               Minted. Tx:{" "}
-              <a
-                href={etherscanTxUrl(mintUnderlying.data.hash)}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-emerald-200"
-              >
+              <a href={etherscanTxUrl(mintUnderlying.data.hash)} target="_blank" rel="noreferrer" className="font-data underline">
                 {mintUnderlying.data.hash.slice(0, 10)}…
               </a>
             </div>
           )}
           {lastAction === "underlying" && mintUnderlying.isError && (
-            <p className="mt-3 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-              {mintUnderlying.error?.message ?? "Mint failed."}
-            </p>
+            <p className="callout callout-err mt-3 text-xs">{mintUnderlying.error?.message ?? "Mint failed."}</p>
           )}
         </div>
       </section>
 
-      <section className="mt-8 flex flex-wrap items-center gap-4 border-t border-zinc-800 pt-6 text-sm">
-        <Link href="/create" className="text-emerald-400 hover:text-emerald-300">
+      <section className="divider-stamped mt-8 flex flex-wrap items-center gap-4 pt-6 text-sm">
+        <Link href="/create" className="link-gold">
           Next: create a distribution →
         </Link>
         {cttt?.address && (
-          <Link
-            href={`/verify?token=${cttt.address}`}
-            className="text-emerald-400 hover:text-emerald-300"
-          >
+          <Link href={`/verify?token=${cttt.address}`} className="link-gold">
             Check your confidential balance →
           </Link>
         )}

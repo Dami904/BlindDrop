@@ -64,8 +64,8 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <label className="block text-sm font-medium text-zinc-200">CSV upload</label>
+        <div className="panel p-4">
+          <label className="label">CSV upload</label>
           <input
             ref={fileInputRef}
             type="file"
@@ -75,18 +75,19 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
               if (file) handleFile(file);
               e.target.value = "";
             }}
-            className="mt-2 block w-full text-sm text-zinc-400 file:mr-3 file:rounded-md file:border-0 file:bg-emerald-500 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-black hover:file:bg-emerald-400"
+            className="mt-2 block w-full text-sm file:mr-3 file:rounded-[3px] file:border-0 file:bg-[var(--seal)] file:px-3 file:py-1.5 file:font-data file:text-xs file:uppercase file:tracking-wide file:text-[var(--paper)] hover:file:bg-[var(--seal-bright)]"
+            style={{ color: "var(--text-dim)" }}
           />
         </div>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <label className="block text-sm font-medium text-zinc-200">Paste rows</label>
+        <div className="panel p-4">
+          <label className="label">Paste rows</label>
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             placeholder={"0xabc...,10\n0xdef...,25.5"}
             rows={3}
-            className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+            className="field font-data mt-2"
           />
           <button
             type="button"
@@ -95,7 +96,7 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
               setPasteText("");
             }}
             disabled={!pasteText.trim()}
-            className="mt-2 rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="btn btn-seal mt-2"
           >
             Add pasted rows
           </button>
@@ -103,7 +104,7 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
       </div>
 
       {importErrors.length > 0 && (
-        <div className="rounded-md border border-amber-800/50 bg-amber-950/30 p-3 text-sm text-amber-300">
+        <div className="callout callout-warn">
           <ul className="list-inside list-disc space-y-0.5">
             {importErrors.map((err, i) => (
               <li key={i}>{err}</li>
@@ -114,76 +115,124 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
 
       <div>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-200">Recipients ({entries.length})</h3>
-          <button
-            type="button"
-            onClick={addManualRow}
-            className="rounded-md border border-zinc-700 px-3 py-1 text-sm text-zinc-200 hover:bg-zinc-800"
-          >
+          <h3 className="eyebrow">Recipients ({entries.length})</h3>
+          <button type="button" onClick={addManualRow} className="btn btn-ghost text-xs">
             + Add recipient
           </button>
         </div>
 
-        <div className="mt-3 overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-900/70 text-left text-zinc-400">
-              <tr>
-                <th className="px-3 py-2 font-normal">Address</th>
-                <th className="px-3 py-2 font-normal">Amount</th>
-                <th className="px-3 py-2 font-normal"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-4 text-center text-zinc-500">
-                    No recipients yet. Upload a CSV, paste rows, or add one manually.
-                  </td>
-                </tr>
-              )}
-              {entries.map((entry) => {
-                const error = validated.errorsById[entry.id];
-                return (
-                  <tr key={entry.id} className="border-t border-zinc-800">
-                    <td className="px-3 py-1.5">
-                      <input
-                        value={entry.address}
-                        onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
-                        placeholder="0x..."
-                        className="w-full rounded border border-transparent bg-transparent px-2 py-1 font-mono text-xs text-zinc-100 focus:border-emerald-500 focus:bg-zinc-950 focus:outline-none"
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
+        {entries.length === 0 && (
+          <p className="mt-3 rounded-[var(--r-md)] border px-3 py-6 text-center text-sm" style={{ borderColor: "var(--line)", color: "var(--text-faint)" }}>
+            No recipients yet. Upload a CSV, paste rows, or add one manually.
+          </p>
+        )}
+
+        {/* mobile: card-per-row */}
+        {entries.length > 0 && (
+          <div className="mt-3 flex flex-col gap-2 sm:hidden">
+            {entries.map((entry) => {
+              const error = validated.errorsById[entry.id];
+              return (
+                <div key={entry.id} className="panel p-3">
+                  <label className="label">Address</label>
+                  <input
+                    value={entry.address}
+                    onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
+                    placeholder="0x..."
+                    className="field font-data mt-1 text-xs"
+                  />
+                  <div className="mt-2 flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="label">Amount</label>
                       <input
                         value={entry.amount}
                         onChange={(e) => updateEntry(entry.id, { amount: e.target.value })}
                         placeholder="0.0"
-                        className="w-28 rounded border border-transparent bg-transparent px-2 py-1 text-zinc-100 focus:border-emerald-500 focus:bg-zinc-950 focus:outline-none"
+                        className="field tabular mt-1"
                       />
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeEntry(entry.id)}
-                        className="text-xs text-zinc-500 hover:text-red-400"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                    {error && (
-                      <td className="hidden" aria-hidden>
-                        {error}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeEntry(entry.id)}
+                      className="btn btn-ghost text-xs"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {error && (
+                    <p className="mt-1 text-xs" style={{ color: "var(--err)" }}>
+                      {error}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* desktop: table */}
+        {entries.length > 0 && (
+          <div className="mt-3 hidden overflow-x-auto rounded-[var(--r-md)] border sm:block" style={{ borderColor: "var(--line)" }}>
+            <table className="w-full text-sm">
+              <thead style={{ background: "var(--ink-3)" }}>
+                <tr>
+                  <th className="px-3 py-2 text-left font-data text-xs uppercase tracking-wide font-normal" style={{ color: "var(--text-dim)" }}>
+                    Address
+                  </th>
+                  <th className="px-3 py-2 text-left font-data text-xs uppercase tracking-wide font-normal" style={{ color: "var(--text-dim)" }}>
+                    Amount
+                  </th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => {
+                  const error = validated.errorsById[entry.id];
+                  return (
+                    <tr key={entry.id} className="border-t" style={{ borderColor: "var(--line)" }}>
+                      <td className="px-3 py-1.5">
+                        <input
+                          value={entry.address}
+                          onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
+                          placeholder="0x..."
+                          className="font-data w-full rounded border border-transparent bg-transparent px-2 py-1 text-xs focus:outline-none"
+                          style={{ color: "var(--text)" }}
+                        />
                       </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <td className="px-3 py-1.5">
+                        <input
+                          value={entry.amount}
+                          onChange={(e) => updateEntry(entry.id, { amount: e.target.value })}
+                          placeholder="0.0"
+                          className="tabular w-28 rounded border border-transparent bg-transparent px-2 py-1 focus:outline-none"
+                          style={{ color: "var(--text)" }}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeEntry(entry.id)}
+                          className="text-xs"
+                          style={{ color: "var(--text-faint)" }}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                      {error && (
+                        <td className="hidden" aria-hidden>
+                          {error}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {entries.some((e) => validated.errorsById[e.id]) && (
-          <ul className="mt-2 space-y-0.5 text-xs text-red-400">
+          <ul className="mt-2 space-y-0.5 text-xs" style={{ color: "var(--err)" }}>
             {entries.map((e) =>
               validated.errorsById[e.id] ? (
                 <li key={e.id}>

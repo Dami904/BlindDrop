@@ -36,18 +36,24 @@ function downloadJson(filename: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
 export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps) {
   const zamaSDK = useZamaSDK();
   const sign = useSignClaimAuthorization();
 
   const [packets, setPackets] = useState<GeneratedPacket[]>([]);
   const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<"encrypting" | "signing" | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
 
   const total = recipients.length;
   const done = progress;
+  const current = recipients[progress];
 
   async function generateAll() {
     setError(null);
@@ -60,6 +66,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
       for (const recipient of recipients) {
         const amountUnits = scaleAmountToUnits(recipient.amount, 6);
 
+        setStage("encrypting");
         const encryptedInput = await encryptUint64({
           encryptor: toTokenOpsEncryptor(zamaSDK.relayer),
           contractAddress: deployed.airdrop,
@@ -67,6 +74,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           value: amountUnits,
         });
 
+        setStage("signing");
         const signature = await sign.mutateAsync({
           airdropAddress: deployed.airdrop,
           recipient: recipient.address,
@@ -94,6 +102,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsRunning(false);
+      setStage(null);
     }
   }
 
@@ -111,9 +120,9 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-lg font-medium text-zinc-100">3. Claim packets</h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          For each recipient, an encrypted allocation is created and bound to their address, then
+        <h2 className="font-display text-lg">III. Claim packets</h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+          For each recipient, an encrypted allocation is sealed to their address, then
           admin-signed. This runs sequentially and can take a while — each step is a real FHE
           encryption + relayer round-trip. Nothing is sent to a server; packets stay in your browser.
         </p>
@@ -124,86 +133,88 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           type="button"
           onClick={generateAll}
           disabled={recipients.length === 0}
-          className="w-fit rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="btn btn-seal w-fit"
         >
-          Generate {recipients.length} claim packet{recipients.length === 1 ? "" : "s"}
+          Seal {recipients.length} claim packet{recipients.length === 1 ? "" : "s"}
         </button>
       )}
 
       {(isRunning || packets.length > 0) && (
         <div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+          <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--ink-3)" }}>
             <div
-              className="h-full bg-emerald-500 transition-all"
-              style={{ width: `${total === 0 ? 0 : (done / total) * 100}%` }}
+              className="h-full transition-all"
+              style={{
+                width: `${total === 0 ? 0 : (done / total) * 100}%`,
+                background: "linear-gradient(90deg, var(--seal), var(--gold))",
+                transitionDuration: "var(--dur-med)",
+              }}
             />
           </div>
-          <p className="mt-1 text-xs text-zinc-500">
-            {done} / {total} generated{isRunning ? "…" : ""}
+          <p className="font-data mt-2 text-xs" style={{ color: "var(--text-dim)" }}>
+            {isRunning && current ? (
+              <>
+                {stage === "signing" ? "Signing" : "Encrypting"} allocation {done + 1} of {total} —{" "}
+                {shortAddress(current.address)}…
+              </>
+            ) : (
+              <>
+                {done} / {total} sealed{isRunning ? "…" : ""}
+              </>
+            )}
           </p>
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--err)" }}>{error}</p>}
 
       {packets.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-zinc-400">{packets.length} packet{packets.length === 1 ? "" : "s"} ready</p>
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              {packets.length} packet{packets.length === 1 ? "" : "s"} ready
+            </p>
             <div className="flex gap-2">
               {!isRunning && packets.length < total && (
-                <button
-                  type="button"
-                  onClick={generateAll}
-                  className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-800"
-                >
+                <button type="button" onClick={generateAll} className="btn btn-ghost text-xs">
                   Retry / regenerate
                 </button>
               )}
-              <button
-                type="button"
-                onClick={downloadAll}
-                className="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-black hover:bg-white"
-              >
+              <button type="button" onClick={downloadAll} className="btn btn-gold text-xs">
                 Download all (JSON array)
               </button>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-lg border border-zinc-800">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-900/70 text-left text-zinc-400">
-                <tr>
-                  <th className="px-3 py-2 font-normal">Recipient</th>
-                  <th className="px-3 py-2 font-normal"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {packets.map((gp) => (
-                  <tr key={gp.address} className="border-t border-zinc-800">
-                    <td className="px-3 py-2 font-mono text-xs text-zinc-200">{gp.address}</td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => copyBase64(gp)}
-                          className="text-xs text-emerald-400 hover:text-emerald-300"
-                        >
-                          {copiedFor === gp.address ? "Copied!" : "Copy as base64"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadJson(`claim-packet-${gp.address}.json`, gp.packet)}
-                          className="text-xs text-zinc-300 hover:text-zinc-100"
-                        >
-                          Download JSON
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {packets.map((gp) => (
+              <div key={gp.address} className="envelope-card">
+                <div className="envelope-flap" aria-hidden />
+                <div className="relative z-10 p-4 pt-12">
+                  <p className="eyebrow">Sealed packet</p>
+                  <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text)" }}>
+                    {gp.address}
+                  </p>
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => copyBase64(gp)}
+                      className="link-gold text-xs"
+                    >
+                      {copiedFor === gp.address ? "Copied!" : "Copy as base64"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadJson(`claim-packet-${gp.address}.json`, gp.packet)}
+                      className="text-xs"
+                      style={{ color: "var(--text-dim)" }}
+                    >
+                      Download JSON
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { RecipientsStep } from "@/components/create/RecipientsStep";
 import { CampaignStep, type DeployedCampaign } from "@/components/create/CampaignStep";
 import { ClaimPacketsStep } from "@/components/create/ClaimPacketsStep";
 import { newRecipientEntry, validateRecipientEntries, type RecipientEntry } from "@/lib/csv";
+import { OnboardingHint } from "@/components/OnboardingHint";
 
 function randomSalt(): Hex {
   const bytes = new Uint8Array(32);
@@ -31,40 +32,49 @@ export default function CreatePage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <h1 className="text-3xl font-semibold text-zinc-50">Create Distribution</h1>
-      <p className="mt-3 text-zinc-400">
+      <p className="eyebrow">Case file · new distribution</p>
+      <h1 className="font-display mt-2 text-3xl">Create Distribution</h1>
+      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>
 
-      <ol className="mt-8 flex items-center gap-4 text-sm">
-        {STEPS.map((s, i) => (
-          <li key={s.id} className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (s.id === 1 || (s.id === 2 && validated.valid.length > 0) || (s.id === 3 && deployed)) {
-                  setStep(s.id);
-                }
-              }}
-              className={`flex items-center gap-2 ${
-                step === s.id ? "text-emerald-400" : "text-zinc-500"
-              }`}
-            >
-              <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs ${
-                  step === s.id ? "border-emerald-400 text-emerald-400" : "border-zinc-700"
-                }`}
+      <OnboardingHint
+        step={2}
+        total={5}
+        title="Step two: create"
+        body="List recipients, deploy the airdrop contract, then seal an encrypted claim packet for each address."
+      />
+
+      <ol className="mt-8 flex items-center gap-3 text-sm">
+        {STEPS.map((s, i) => {
+          const state = step === s.id ? "active" : s.id < step ? "done" : undefined;
+          const reachable =
+            s.id === 1 || (s.id === 2 && validated.valid.length > 0) || (s.id === 3 && !!deployed);
+          return (
+            <li key={s.id} className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => reachable && setStep(s.id)}
+                disabled={!reachable}
+                className="flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ color: step === s.id ? "var(--gold)" : "var(--text-dim)" }}
               >
-                {s.id}
-              </span>
-              {s.label}
-            </button>
-            {i < STEPS.length - 1 && <span className="text-zinc-700">—</span>}
-          </li>
-        ))}
+                <span className="seal-badge" data-state={state}>
+                  {s.id}
+                </span>
+                <span className="font-data text-xs tracking-wide uppercase">{s.label}</span>
+              </button>
+              {i < STEPS.length - 1 && (
+                <span aria-hidden style={{ color: "var(--text-faint)" }}>
+                  ···
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
-      <div className="mt-10 rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
+      <div className="panel mt-8 p-6">
         {step === 1 && (
           <RecipientsStep entries={entries} onChange={setEntries} onNext={() => setStep(2)} />
         )}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanTxUrl } from "@/lib/packet";
+import { OnboardingHint } from "@/components/OnboardingHint";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -93,28 +94,42 @@ export default function DispersePage() {
     !!preflight.data?.ready &&
     !disperse.isPending;
 
+  const prereqSteps = [
+    { label: "Register your wallet pair", done: isRegistered.data === true },
+    { label: "Approve token operator", done: approvals.data?.both === true },
+    { label: "Disperse", done: disperse.isSuccess },
+  ];
+
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <h1 className="text-3xl font-semibold text-zinc-50">Disperse Tokens</h1>
-      <p className="mt-3 text-zinc-400">
+      <p className="eyebrow">One-shot distribution</p>
+      <h1 className="font-display mt-2 text-3xl">Disperse Tokens</h1>
+      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Batch-send encrypted token amounts to many recipients in a single confidential
         transaction — no campaign or claim step required.
       </p>
 
+      <OnboardingHint
+        step={2}
+        total={5}
+        title="Alternative to the claim-packet flow"
+        body="Skips claim packets entirely — recipients get their tokens immediately in one confidential transaction you sign."
+        nextHref="/verify"
+        nextLabel="Recipients can verify their balance"
+      />
+
       {!isConnected && (
-        <div className="mt-8 rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
-          Connect your wallet to disperse tokens.
-        </div>
+        <div className="callout callout-warn mt-8">Connect your wallet to disperse tokens.</div>
       )}
 
       {isConnected && wrongChain && (
-        <div className="mt-8 flex items-center justify-between rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+        <div className="callout callout-warn callout-between mt-8">
           <span>Switch to Sepolia (chain {SEPOLIA_CHAIN_ID}) to disperse tokens.</span>
           <button
             type="button"
             onClick={() => switchChain({ chainId: sepolia.id })}
             disabled={isSwitching}
-            className="ml-4 shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn btn-gold ml-4 shrink-0 text-xs"
           >
             {isSwitching ? "Switching…" : "Switch to Sepolia"}
           </button>
@@ -122,31 +137,34 @@ export default function DispersePage() {
       )}
 
       <section className="mt-8 space-y-3">
-        <label className="block text-sm font-medium text-zinc-300">
-          ERC-7984 confidential token address
-        </label>
+        <label className="label">ERC-7984 confidential token address</label>
         <input
           value={tokenInput}
           onChange={(e) => setTokenInput(e.target.value)}
           placeholder="0x…"
-          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+          className="field font-data"
         />
         {!tokenValid && tokenInput.length > 0 && (
-          <p className="text-xs text-red-400">Not a valid address.</p>
+          <p className="text-xs" style={{ color: "var(--err)" }}>
+            Not a valid address.
+          </p>
         )}
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs" style={{ color: "var(--text-faint)" }}>
           Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
-          <a href="/faucet" className="text-emerald-400 hover:text-emerald-300">
+          <a href="/faucet" className="link-gold">
             Claim some →
           </a>
         </p>
       </section>
 
-      <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
-        <h2 className="text-lg font-medium text-zinc-100">Recipients</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+      <section className="panel mt-8 p-6">
+        <h2 className="font-display text-lg">Recipients</h2>
+        <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
           Upload a CSV, paste rows, or add recipients manually. Format:{" "}
-          <code className="text-zinc-300">address,amount</code> per line.
+          <code className="font-data" style={{ color: "var(--text)" }}>
+            address,amount
+          </code>{" "}
+          per line.
         </p>
         <div className="mt-4">
           <DisperseRecipients entries={entries} onChange={setEntries} validated={validated} />
@@ -154,93 +172,111 @@ export default function DispersePage() {
       </section>
 
       {ready && token && (
-        <section className="mt-6 rounded-xl border border-zinc-800 bg-zinc-950/60 p-6">
-          <h2 className="text-lg font-medium text-zinc-100">1. Register your wallet pair</h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            One-time setup: the disperse singleton deploys a dedicated wallet pair for your
-            address to hold funds mid-transfer.
-          </p>
-          <button
-            type="button"
-            onClick={() =>
-              register.mutate({ token }, { onSuccess: invalidateDisperseQueries })
-            }
-            disabled={isRegistered.data === true || register.isPending}
-            className="mt-3 rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {isRegistered.data === true
-              ? "Registered"
-              : register.isPending
-              ? "Registering…"
-              : "Register"}
-          </button>
-          {register.isError && (
-            <p className="mt-2 text-xs text-red-400">{register.error?.message}</p>
-          )}
+        <section className="panel mt-6 p-6">
+          <h2 className="eyebrow mb-4">Prerequisites checklist</h2>
+          <ol className="flex flex-col gap-6">
+            <li>
+              <div className="flex items-center gap-3">
+                <span className="seal-badge" data-state={prereqSteps[0].done ? "done" : "active"}>
+                  {prereqSteps[0].done ? "✓" : "1"}
+                </span>
+                <h3 className="font-display text-base">Register your wallet pair</h3>
+              </div>
+              <p className="mt-1 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
+                One-time setup: the disperse singleton deploys a dedicated wallet pair for your
+                address to hold funds mid-transfer.
+              </p>
+              <div className="ml-10">
+                <button
+                  type="button"
+                  onClick={() => register.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
+                  disabled={isRegistered.data === true || register.isPending}
+                  className="btn btn-seal mt-3"
+                >
+                  {isRegistered.data === true ? "Registered" : register.isPending ? "Registering…" : "Register"}
+                </button>
+                {register.isError && (
+                  <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
+                    {register.error?.message}
+                  </p>
+                )}
+              </div>
+            </li>
 
-          <h2 className="mt-6 text-lg font-medium text-zinc-100">2. Approve token operator</h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            Your registered wallets must be approved as ERC-7984 operators for this token before
-            a wallet-mode disperse can move funds.
-          </p>
-          <button
-            type="button"
-            onClick={() =>
-              approve.mutate({ token }, { onSuccess: invalidateDisperseQueries })
-            }
-            disabled={isRegistered.data !== true || approvals.data?.both === true || approve.isPending}
-            className="mt-3 rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {approvals.data?.both === true
-              ? "Approved"
-              : approve.isPending
-              ? "Approving…"
-              : "Approve operator"}
-          </button>
-          {approve.isError && (
-            <p className="mt-2 text-xs text-red-400">{approve.error?.message}</p>
-          )}
+            <li>
+              <div className="flex items-center gap-3">
+                <span className="seal-badge" data-state={prereqSteps[1].done ? "done" : isRegistered.data === true ? "active" : undefined}>
+                  {prereqSteps[1].done ? "✓" : "2"}
+                </span>
+                <h3 className="font-display text-base">Approve token operator</h3>
+              </div>
+              <p className="mt-1 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
+                Your registered wallets must be approved as ERC-7984 operators for this token
+                before a wallet-mode disperse can move funds.
+              </p>
+              <div className="ml-10">
+                <button
+                  type="button"
+                  onClick={() => approve.mutate({ token }, { onSuccess: invalidateDisperseQueries })}
+                  disabled={isRegistered.data !== true || approvals.data?.both === true || approve.isPending}
+                  className="btn btn-seal mt-3"
+                >
+                  {approvals.data?.both === true ? "Approved" : approve.isPending ? "Approving…" : "Approve operator"}
+                </button>
+                {approve.isError && (
+                  <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
+                    {approve.error?.message}
+                  </p>
+                )}
+              </div>
+            </li>
 
-          <h2 className="mt-6 text-lg font-medium text-zinc-100">3. Disperse</h2>
-          {preflight.data && !preflight.data.ready && preflight.data.blockerErrors.length > 0 && (
-            <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs text-amber-300">
-              {preflight.data.blockerErrors.map((err, i) => (
-                <li key={i}>{err.message}</li>
-              ))}
-            </ul>
-          )}
-          <button
-            type="button"
-            onClick={() =>
-              disperse.mutate(
-                { token, mode: "wallet", recipients, amounts },
-                { onSuccess: invalidateDisperseQueries }
-              )
-            }
-            disabled={!canSubmit}
-            className="mt-3 rounded-full bg-emerald-500 px-5 py-2 text-sm font-medium text-black hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {disperse.isPending ? "Dispersing…" : "Disperse tokens"}
-          </button>
+            <li>
+              <div className="flex items-center gap-3">
+                <span className="seal-badge" data-state={prereqSteps[2].done ? "done" : approvals.data?.both === true ? "active" : undefined}>
+                  {prereqSteps[2].done ? "✓" : "3"}
+                </span>
+                <h3 className="font-display text-base">Disperse</h3>
+              </div>
 
-          {disperse.isSuccess && disperse.data && (
-            <div className="mt-3 rounded-md border border-emerald-800/50 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300">
-              Dispersed. Tx:{" "}
-              <a
-                href={etherscanTxUrl(disperse.data.hash)}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-emerald-200"
-              >
-                {disperse.data.hash.slice(0, 10)}…
-              </a>
-            </div>
-          )}
-          {disperse.isError && (
-            <p className="mt-3 rounded-md border border-red-800/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
-              {disperse.error?.message ?? "Disperse failed."}
-            </p>
-          )}
+              <div className="ml-10">
+                {preflight.data && !preflight.data.ready && preflight.data.blockerErrors.length > 0 && (
+                  <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs" style={{ color: "var(--warn)" }}>
+                    {preflight.data.blockerErrors.map((err, i) => (
+                      <li key={i}>{err.message}</li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    disperse.mutate(
+                      { token, mode: "wallet", recipients, amounts },
+                      { onSuccess: invalidateDisperseQueries }
+                    )
+                  }
+                  disabled={!canSubmit}
+                  className="btn btn-gold mt-3"
+                >
+                  {disperse.isPending ? "Dispersing…" : "Disperse tokens"}
+                </button>
+
+                {disperse.isSuccess && disperse.data && (
+                  <div className="callout callout-ok mt-3 text-xs">
+                    Dispersed. Tx:{" "}
+                    <a href={etherscanTxUrl(disperse.data.hash)} target="_blank" rel="noreferrer" className="font-data underline">
+                      {disperse.data.hash.slice(0, 10)}…
+                    </a>
+                  </div>
+                )}
+                {disperse.isError && (
+                  <p className="callout callout-err mt-3 text-xs">
+                    {disperse.error?.message ?? "Disperse failed."}
+                  </p>
+                )}
+              </div>
+            </li>
+          </ol>
         </section>
       )}
     </div>

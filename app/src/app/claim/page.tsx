@@ -14,6 +14,7 @@ import {
   SEPOLIA_CHAIN_ID,
   type ClaimPacket,
 } from "@/lib/packet";
+import { OnboardingHint } from "@/components/OnboardingHint";
 
 type LoadState =
   | { kind: "idle" }
@@ -63,6 +64,7 @@ export default function ClaimPage() {
 
   const [pasteText, setPasteText] = useState("");
   const [loadState, setLoadState] = useState<LoadState>({ kind: "idle" });
+  const [isDragging, setIsDragging] = useState(false);
 
   const packet = loadState.kind === "loaded" ? loadState.packet : undefined;
 
@@ -73,7 +75,7 @@ export default function ClaimPage() {
     if (!result.ok) {
       const message =
         result.error.kind === "empty-input"
-          ? "Paste or upload a claim packet first."
+          ? "Drop or paste a claim packet first."
           : result.error.kind === "invalid-json"
             ? `Couldn't parse that as JSON or base64 JSON: ${result.error.message}`
             : "That doesn't look like a valid claim packet — check the shape against what your airdrop admin sent you.";
@@ -108,179 +110,202 @@ export default function ClaimPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
-      <h1 className="text-3xl font-semibold text-zinc-50">Claim Tokens</h1>
-      <p className="mt-3 text-zinc-400">
-        Load the claim packet your airdrop admin gave you, then submit it from the connected
+      <p className="eyebrow">Recipient intake</p>
+      <h1 className="font-display mt-2 text-3xl">Claim Tokens</h1>
+      <p className="mt-3" style={{ color: "var(--text-dim)" }}>
+        Open the claim packet your airdrop admin gave you, then submit it from the connected
         wallet it was issued to.
       </p>
 
+      <OnboardingHint
+        step={4}
+        total={5}
+        title="Step four: claim"
+        body="Your packet holds an encrypted amount and a one-time signature — only your wallet can submit it."
+        nextHref="/verify"
+        nextLabel="Then verify & decrypt your balance"
+      />
+
       {!isConnected && (
-        <div className="mt-8 rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
-          Connect your wallet to continue.
-        </div>
+        <div className="callout callout-warn mt-8">Connect your wallet to continue.</div>
       )}
 
       <section className="mt-8 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-300">
-            Upload claim packet (.json)
-          </label>
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            void onFileChange(e.dataTransfer.files?.[0]);
+          }}
+          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 border-dashed px-6 py-12 text-center transition-colors"
+          style={{
+            borderColor: isDragging ? "var(--gold)" : "var(--line-strong)",
+            background: isDragging ? "var(--gold-dim)" : "var(--ink-2)",
+          }}
+        >
+          <EnvelopeIcon />
+          <p className="font-display text-base">Drop your claim packet here</p>
+          <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+            .json file, or click to browse
+          </p>
           <input
             type="file"
             accept="application/json,.json,.txt"
             onChange={(e) => void onFileChange(e.target.files?.[0])}
-            className="mt-2 block w-full text-sm text-zinc-400 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-100 hover:file:bg-zinc-700"
+            className="sr-only"
           />
+        </label>
+
+        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-faint)" }}>
+          <span className="h-px flex-1" style={{ background: "var(--line)" }} />
+          or paste it
+          <span className="h-px flex-1" style={{ background: "var(--line)" }} />
         </div>
 
-        <div className="text-center text-xs uppercase tracking-wide text-zinc-600">or</div>
-
         <div>
-          <label className="block text-sm font-medium text-zinc-300">
-            Paste packet JSON or base64
-          </label>
           <textarea
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             rows={5}
             placeholder='{"version":1,"airdrop":"0x…", …}'
-            className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-600 focus:outline-none"
+            className="field font-data text-xs"
           />
-          <button
-            type="button"
-            onClick={() => loadFromText(pasteText)}
-            className="mt-2 rounded-full bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-100 transition-colors hover:bg-zinc-700"
-          >
+          <button type="button" onClick={() => loadFromText(pasteText)} className="btn btn-ghost mt-2">
             Load packet
           </button>
         </div>
 
-        {loadState.kind === "error" && (
-          <div className="rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-            {loadState.message}
-          </div>
-        )}
+        {loadState.kind === "error" && <div className="callout callout-err">{loadState.message}</div>}
       </section>
 
       {packet && (
-        <section className="mt-10 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-          <h2 className="text-lg font-semibold text-zinc-50">Claim summary</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-400">Airdrop contract</dt>
-              <dd>
-                <a
-                  href={etherscanAddressUrl(packet.airdrop)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-emerald-400 hover:underline"
-                >
-                  {shortAddress(packet.airdrop)}
-                </a>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-400">Confidential token</dt>
-              <dd>
-                <a
-                  href={etherscanAddressUrl(packet.token)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-emerald-400 hover:underline"
-                >
-                  {shortAddress(packet.token)}
-                </a>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-400">Recipient</dt>
-              <dd className="font-mono text-zinc-200">{shortAddress(packet.recipient)}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-zinc-400">Status</dt>
-              <dd className="text-zinc-200">
-                {claim.isSuccess
-                  ? "Claimed"
-                  : claim.isPending
-                    ? "Submitting…"
-                    : "Not yet claimed"}
-              </dd>
-            </div>
-          </dl>
+        <section className="envelope-card mt-10">
+          <div className="envelope-flap" aria-hidden />
+          <div className="relative z-10 p-6 pt-14">
+            <h2 className="font-display text-lg">Claim summary</h2>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <dt style={{ color: "var(--text-dim)" }}>Airdrop contract</dt>
+                <dd>
+                  <a
+                    href={etherscanAddressUrl(packet.airdrop)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="link-gold font-data"
+                  >
+                    {shortAddress(packet.airdrop)}
+                  </a>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt style={{ color: "var(--text-dim)" }}>Confidential token</dt>
+                <dd>
+                  <a
+                    href={etherscanAddressUrl(packet.token)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="link-gold font-data"
+                  >
+                    {shortAddress(packet.token)}
+                  </a>
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt style={{ color: "var(--text-dim)" }}>Recipient</dt>
+                <dd className="font-data" style={{ color: "var(--text)" }}>
+                  {shortAddress(packet.recipient)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt style={{ color: "var(--text-dim)" }}>Status</dt>
+                <dd style={{ color: "var(--text)" }}>
+                  {claim.isSuccess ? "Claimed" : claim.isPending ? "Submitting…" : "Not yet claimed"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt style={{ color: "var(--text-dim)" }}>Allocation</dt>
+                <dd>
+                  <span className="redaction px-2 py-0.5 text-sm">sealed</span>
+                </dd>
+              </div>
+            </dl>
 
-          {recipientMismatch && (
-            <div className="mt-5 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-              This packet was issued to <span className="font-mono">{shortAddress(packet.recipient)}</span>,
-              but your connected wallet is{" "}
-              <span className="font-mono">{address ? shortAddress(address) : "unknown"}</span>. Switch to the
-              matching wallet to claim.
-            </div>
-          )}
+            {recipientMismatch && (
+              <div className="callout callout-err mt-5">
+                This packet was issued to <span className="font-data">{shortAddress(packet.recipient)}</span>,
+                but your connected wallet is{" "}
+                <span className="font-data">{address ? shortAddress(address) : "unknown"}</span>. Switch to the
+                matching wallet to claim.
+              </div>
+            )}
 
-          {!recipientMismatch && wrongChain && (
-            <div className="mt-5 flex items-center justify-between rounded-xl border border-amber-800/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
-              <span>This claim packet is for Sepolia. Switch networks to continue.</span>
+            {!recipientMismatch && wrongChain && (
+              <div className="callout callout-warn callout-between mt-5">
+                <span>This claim packet is for Sepolia. Switch networks to continue.</span>
+                <button
+                  type="button"
+                  onClick={() => switchChain({ chainId: sepolia.id })}
+                  disabled={isSwitching}
+                  className="btn btn-gold ml-4 shrink-0 text-xs"
+                >
+                  {isSwitching ? "Switching…" : "Switch to Sepolia"}
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6">
               <button
                 type="button"
-                onClick={() => switchChain({ chainId: sepolia.id })}
-                disabled={isSwitching}
-                className="ml-4 shrink-0 rounded-full bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!canSubmit}
+                onClick={() =>
+                  claim.mutate({
+                    encryptedInput: packet.encryptedInput,
+                    signature: packet.signature,
+                  })
+                }
+                className="btn btn-seal w-full py-3"
               >
-                {isSwitching ? "Switching…" : "Switch to Sepolia"}
+                {claim.isPending ? "Breaking the seal…" : "Claim my allocation"}
               </button>
             </div>
-          )}
 
-          <div className="mt-6">
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={() =>
-                claim.mutate({
-                  encryptedInput: packet.encryptedInput,
-                  signature: packet.signature,
-                })
-              }
-              className="w-full rounded-full bg-emerald-500 px-4 py-3 text-sm font-semibold text-black transition-colors hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {claim.isPending ? "Claiming…" : "Claim my allocation"}
-            </button>
-          </div>
+            {claim.isError && <div className="callout callout-err mt-4">{describeClaimError(claim.error)}</div>}
 
-          {claim.isError && (
-            <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-300">
-              {describeClaimError(claim.error)}
-            </div>
-          )}
-
-          {claim.isSuccess && claim.data && (
-            <div className="mt-4 rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-300">
-              Claim submitted.{" "}
-              <a
-                href={etherscanTxUrl(claim.data)}
-                target="_blank"
-                rel="noreferrer"
-                className="font-mono underline"
-              >
-                View on Etherscan
-              </a>
-              <div className="mt-2">
-                <a
-                  href={`/verify?token=${packet.token}`}
-                  className="text-emerald-200 underline underline-offset-2"
-                >
+            {claim.isSuccess && claim.data && (
+              <div className="callout callout-ok callout-col mt-4">
+                <span>
+                  Claim submitted.{" "}
+                  <a href={etherscanTxUrl(claim.data)} target="_blank" rel="noreferrer" className="font-data underline">
+                    View on Etherscan
+                  </a>
+                </span>
+                <a href={`/verify?token=${packet.token}`} className="link-gold mt-2">
                   Verify &amp; decrypt my allocation →
                 </a>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       )}
 
-      <p className="mt-10 text-xs text-zinc-600">
+      <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
         Claim packets expected on chain ID {SEPOLIA_CHAIN_ID} (Sepolia). Never share your packet's
         signature with anyone other than the airdrop contract — it authorizes a one-time claim.
       </p>
     </div>
+  );
+}
+
+function EnvelopeIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden>
+      <rect x="3" y="8" width="34" height="24" rx="2" stroke="var(--gold)" strokeWidth="1.5" />
+      <path d="M4 9.5 20 22 36 9.5" stroke="var(--gold)" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }
