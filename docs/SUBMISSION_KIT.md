@@ -4,11 +4,12 @@
 
 Film: screen recording of the live app + your webcam/voice. Rehearse once; keep total under 3:00.
 
-**[0:00–0:20] Hook (face to camera or voiceover on the landing page)**
-> "Every airdrop today leaks a spreadsheet: who got tokens, and exactly how much. Competitors,
-> tax authorities, and scammers can all read your cap table off Etherscan. BlindDrop fixes that —
-> confidential token distribution where amounts are encrypted end-to-end and the recipient list
-> never touches the chain. Built on the TokenOps SDK and Zama's FHE protocol."
+**[0:00–0:25] Hook (face to camera or voiceover on the landing page)**
+> "Last year I built NovaPay — a batch payroll dApp. Upload a CSV, pay your whole team in one
+> transaction. It worked. It had one fatal flaw: every salary was public, on-chain, forever.
+> Anyone could read my users' cap table off Etherscan. BlindDrop is what NovaPay should have
+> been — confidential token distribution where amounts are encrypted end-to-end and the
+> recipient list never touches the chain. Built on the TokenOps SDK and Zama's FHE protocol."
 
 **[0:20–0:40] The 5-second pitch of how (landing page, hover the redacted bars)**
 > "Amounts are encrypted in my browser before they ever leave it. On-chain, they're FHE ciphertexts —
