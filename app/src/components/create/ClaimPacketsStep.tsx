@@ -259,6 +259,23 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
     setTimeout(() => setCopiedLinkFor((c) => (c === gp.address ? null : c)), 1500);
   }
 
+  // Native OS share sheet (WhatsApp/Telegram/SMS/…). Mobile-first: the button
+  // renders only where the browser implements navigator.share.
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function sharePacket(gp: GeneratedPacket) {
+    const link = buildClaimLink(window.location.origin, gp.packet);
+    try {
+      await navigator.share({
+        title: "Your BlindDrop claim link",
+        text: "You've received a confidential token allocation. Open your private claim link — only you can use it:",
+        url: link,
+      });
+    } catch {
+      // User dismissed the share sheet — not an error.
+    }
+  }
+
   function mailtoHref(gp: GeneratedPacket, email: string): string {
     const link = buildClaimLink(window.location.origin, gp.packet);
     const subject = "Your BlindDrop claim link";
@@ -527,6 +544,15 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                       >
                         {copiedLinkFor === gp.address ? "Copied!" : "Copy claim link"}
                       </button>
+                      {canNativeShare && (
+                        <button
+                          type="button"
+                          onClick={() => void sharePacket(gp)}
+                          className="link-gold text-xs"
+                        >
+                          Share…
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => copyBase64(gp)}
