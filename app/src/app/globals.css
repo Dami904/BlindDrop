@@ -548,12 +548,14 @@ body {
   transition: background-color var(--dur-med, 240ms) ease, color var(--dur-med, 240ms) ease;
 }
 .redaction-reveal:hover,
-.redaction-reveal:focus-visible {
+.redaction-reveal:focus-visible,
+.redaction-reveal[aria-pressed="true"] {
   background: var(--gold-dim);
   color: var(--gold-bright);
 }
 .redaction-reveal:hover::after,
-.redaction-reveal:focus-visible::after {
+.redaction-reveal:focus-visible::after,
+.redaction-reveal[aria-pressed="true"]::after {
   animation: none;
   opacity: 0;
 }

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAccount, useSwitchChain } from "wagmi";
+import { sepolia } from "wagmi/chains";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -59,6 +61,7 @@ export function NavBar() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle className="hidden sm:inline-flex" />
+          <NetworkBadge className="hidden sm:inline-flex" />
           <ConnectButton />
           <button
             type="button"
@@ -96,6 +99,7 @@ export function NavBar() {
                 </Link>
               );
             })}
+            <MobileNetworkRow />
             <div className="mt-2 flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--line)" }}>
               <span className="font-data text-xs uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>
                 Theme
@@ -106,6 +110,75 @@ export function NavBar() {
         </div>
       )}
     </header>
+  );
+}
+
+/**
+ * Connection-aware network badge shown next to the wallet button. On Sepolia
+ * it's a quiet ok-dot confirmation; on any other chain it becomes a warn
+ * button that switches the wallet back to Sepolia. Hidden while disconnected.
+ */
+function NetworkBadge({ className }: { className?: string }) {
+  const { isConnected, chainId } = useAccount();
+  const { switchChain, isPending } = useSwitchChain();
+
+  if (!isConnected) return null;
+
+  if (chainId === sepolia.id) {
+    return (
+      <span
+        className={`items-center gap-1.5 rounded-[var(--r-sm)] border px-2 py-1 font-data text-[0.65rem] uppercase tracking-wide ${className ?? "inline-flex"}`}
+        style={{
+          borderColor: "var(--line)",
+          background: "var(--ok-dim)",
+          color: "var(--callout-ok-text)",
+        }}
+        title="Connected to Sepolia"
+      >
+        <span
+          aria-hidden
+          className="inline-block h-1.5 w-1.5 rounded-full"
+          style={{ background: "var(--ok)" }}
+        />
+        ⌗ Sepolia
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => switchChain({ chainId: sepolia.id })}
+      disabled={isPending}
+      className={`items-center gap-1.5 rounded-[var(--r-sm)] border px-2 py-1 font-data text-[0.65rem] uppercase tracking-wide ${className ?? "inline-flex"}`}
+      style={{
+        borderColor: "var(--warn)",
+        background: "var(--warn-dim)",
+        color: "var(--callout-warn-text)",
+      }}
+      title="Switch to Sepolia"
+    >
+      <span
+        aria-hidden
+        className="inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: "var(--warn)" }}
+      />
+      {isPending ? "Switching…" : "Wrong network"}
+    </button>
+  );
+}
+
+/** Mobile-menu row for the network badge — mirrors the Theme row layout. */
+function MobileNetworkRow() {
+  const { isConnected } = useAccount();
+  if (!isConnected) return null;
+  return (
+    <div className="mt-2 flex items-center justify-between border-t pt-3" style={{ borderColor: "var(--line)" }}>
+      <span className="font-data text-xs uppercase tracking-wide" style={{ color: "var(--text-dim)" }}>
+        Network
+      </span>
+      <NetworkBadge />
+    </div>
   );
 }
 

@@ -30,6 +30,8 @@ import {
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanTxUrl } from "@/lib/packet";
 import { formatConfidentialAmount } from "@/lib/confidential";
+import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
+import { InfoTip } from "@/components/InfoTip";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -418,6 +420,14 @@ export default function DispersePage() {
             >
               {registeredDone ? "Registered" : register.isPending ? "Registering…" : "Register"}
             </button>
+            {/* useRegister resolves only after the receipt is parsed for the
+                UserRegistered event — phases aren't separable mid-flight. */}
+            <TxStatusLine awaitingWallet={register.isPending} className="mt-2" />
+            {register.isSuccess && register.data && (
+              <p className="mt-2 text-xs" style={{ color: "var(--ok)" }}>
+                Wallet pair registered. <TxHashLink hash={register.data.hash} />
+              </p>
+            )}
             {register.isError && (
               <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
                 {register.error?.message}
@@ -445,6 +455,12 @@ export default function DispersePage() {
             >
               {approvedDone ? "Approved" : approve.isPending ? "Approving…" : "Approve operator"}
             </button>
+            <TxStatusLine awaitingWallet={approve.isPending} className="mt-2" />
+            {approve.isSuccess && approve.data && (
+              <p className="mt-2 text-xs" style={{ color: "var(--ok)" }}>
+                Sub-wallets approved. <TxHashLink hash={approve.data} />
+              </p>
+            )}
             {approve.isError && (
               <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
                 {approve.error?.message}
@@ -461,10 +477,15 @@ export default function DispersePage() {
             onOpenChange={(o) => setSectionOpen(4, o)}
           >
             <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-              One-time approval so the disperse contract can take the total from your wallet
-              and fan it out — expires after an hour. This is separate from the wallet-pair
-              approval above: the disperse contract itself must be allowed to pull from your
-              wallet before it can split funds across your registered wallets.
+              One-time approval so the disperse contract can act as an operator
+              <InfoTip
+                label="Operator"
+                note="An address your token explicitly allows to move funds on your behalf — revocable, time-limited."
+              />
+              — taking the total from your wallet and fanning it out. It expires after an
+              hour, and is separate from the wallet-pair approval above: the disperse
+              contract itself must be allowed to pull from your wallet before it can split
+              funds across your registered wallets.
             </p>
             {approvedDone && isSingletonOperator.isLoading && (
               <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
@@ -473,7 +494,8 @@ export default function DispersePage() {
             )}
             {approvedDone && !isSingletonOperator.isLoading && singletonApprovedDone && (
               <p className="mt-2 text-xs" style={{ color: "var(--ok)" }}>
-                Disperse contract approved to move your tokens.
+                Disperse contract approved to move your tokens.{" "}
+                {setSingletonOperator.data?.txHash && <TxHashLink hash={setSingletonOperator.data.txHash} />}
               </p>
             )}
             <button
@@ -494,6 +516,9 @@ export default function DispersePage() {
                   ? "Approving…"
                   : "Approve disperse contract"}
             </button>
+            {/* Zama's setOperator mutation resolves after the mined receipt —
+                wallet-approval vs confirming isn't observable separately. */}
+            <TxStatusLine awaitingWallet={setSingletonOperator.isPending} className="mt-2" />
             {setSingletonOperator.isError && (
               <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
                 {setSingletonOperator.error instanceof Error
@@ -558,6 +583,9 @@ export default function DispersePage() {
             >
               {disperse.isPending ? "Dispersing…" : "Disperse tokens"}
             </button>
+            {/* useDisperse encrypts client-side then resolves after the
+                receipt — no intermediate hash is observable. */}
+            <TxStatusLine awaitingWallet={disperse.isPending} className="mt-2" />
 
             {disperse.isSuccess && disperse.data && (
               <div className="callout callout-ok mt-3 text-xs">

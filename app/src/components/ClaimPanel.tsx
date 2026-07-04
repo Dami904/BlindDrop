@@ -16,6 +16,7 @@ import {
   SEPOLIA_CHAIN_ID,
   type ClaimPacket,
 } from "@/lib/packet";
+import { TxStatusLine } from "@/components/TxStatus";
 
 type LoadState =
   | { kind: "idle" }
@@ -319,6 +320,9 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
               >
                 {claim.isPending ? "Breaking the seal…" : "Claim my allocation"}
               </button>
+              {/* useClaim resolves with the tx hash only on success — the
+                  wallet-approval and confirming phases aren't separable. */}
+              <TxStatusLine awaitingWallet={claim.isPending} className="mt-2 justify-center" />
             </div>
 
             {claim.isError && <div className="callout callout-err mt-4">{describeClaimError(claim.error)}</div>}

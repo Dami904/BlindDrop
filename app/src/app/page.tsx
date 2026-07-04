@@ -1,14 +1,26 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { HeroDecode } from "@/components/HeroDecode";
 import { Reveal } from "@/components/Reveal";
 import { HowItWorksAccordion } from "@/components/HowItWorksAccordion";
 import { FaucetSection } from "@/components/FaucetSection";
+import { TapRedaction } from "@/components/TapRedaction";
+import { InfoTip } from "@/components/InfoTip";
 
-const journey = [
+const journey: { mark: string; title: string; body: ReactNode; href: string; cta: string }[] = [
   {
     mark: "I",
     title: "Fund",
-    body: "Mint or wrap a confidential ERC-7984 token, then top up the airdrop contract. Only your own wallet ever sees the total.",
+    body: (
+      <>
+        Mint or wrap a confidential ERC-7984
+        <InfoTip
+          label="ERC-7984"
+          note="A token standard whose balances and transfer amounts are encrypted on-chain."
+        />
+        token, then top up the airdrop contract. Only your own wallet ever sees the total.
+      </>
+    ),
     href: "/#faucet",
     cta: "Get testnet tokens",
   },
@@ -68,25 +80,13 @@ export default function Home() {
           style={{ color: "var(--text-faint)" }}
         >
           <span>the</span>
-          <span
-            className="redaction redaction-reveal px-2 py-0.5"
-            tabIndex={0}
-            title="Hover to reveal — that's the point: only you can."
-          >
-            recipient list
-          </span>
+          <TapRedaction className="px-2 py-0.5">recipient list</TapRedaction>
           <span>never leaves your browser</span>
           <span aria-hidden>·</span>
           <span>amounts like</span>
-          <span
-            className="redaction redaction-reveal px-2 py-0.5 tabular"
-            tabIndex={0}
-            title="Hover to reveal — that's the point: only you can."
-          >
-            1,204.50
-          </span>
+          <TapRedaction className="px-2 py-0.5 tabular">1,204.50</TapRedaction>
           <span>stay encrypted — only the recipient can decrypt</span>
-          <span className="basis-full text-center opacity-60">(hover the redacted bits)</span>
+          <span className="basis-full text-center opacity-60">(hover or tap the redacted bits)</span>
         </div>
       </section>
 

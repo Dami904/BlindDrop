@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAccount, useChainId, useSwitchChain, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
 import { useZamaSDK, useConfidentialIsOperator, useConfidentialSetOperator } from "@zama-fhe/react-sdk";
@@ -16,6 +16,8 @@ import { getConfidentialTestTokenAddress, getFheAirdropFactoryAddress } from "@t
 import type { Address, Hex } from "viem";
 import { etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
+import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
+import { InfoTip } from "@/components/InfoTip";
 import { TokenSelect } from "@/components/TokenSelect";
 import { TokenAmountSummary } from "@/components/TokenAmountSummary";
 import type { RecipientRow } from "@/lib/csv";
@@ -244,6 +246,9 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
           >
             {create.isPending ? "Deploying…" : "Deploy campaign"}
           </button>
+          {/* The create hook resolves only after the receipt is parsed, so the
+              wallet-approval and confirming phases can't be told apart. */}
+          <TxStatusLine awaitingWallet={create.isPending} className="mt-2" />
           {deployError && <p className="mt-2 text-sm" style={{ color: "var(--err)" }}>{deployError}</p>}
         </div>
       ) : (
@@ -302,7 +307,13 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
  * the campaign itself.
  */
 function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
-  const { writeContract, isPending, isSuccess, isError, error } = useWriteContract();
+  // wagmi's useWriteContract resolves with the tx hash at SUBMISSION time (it
+  // doesn't wait for the receipt), so this is the one action where the full
+  // phase split is honestly observable: pending-no-hash = wallet approval,
+  // hash + receipt pending = confirming on Sepolia.
+  const { writeContract, data: hash, isPending, isError, error } = useWriteContract();
+  const receipt = useWaitForTransactionReceipt({ hash });
+  const registered = receipt.isSuccess;
 
   function handleSave() {
     writeContract({
@@ -321,18 +332,30 @@ function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
         after a reload. This is just a lookup aid — it costs a small gas fee, is entirely optional,
         and never affects who can claim or fund this campaign.
       </p>
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={handleSave}
-          disabled={isPending || isSuccess}
+          disabled={isPending || (!!hash && !receipt.isError) }
           className="btn btn-gold text-xs"
         >
-          {isSuccess ? "Registered ✓" : isPending ? "Saving…" : "Save to my campaigns"}
+          {registered ? "Registered ✓" : isPending || receipt.isLoading ? "Saving…" : "Save to my campaigns"}
         </button>
+        <TxStatusLine
+          awaitingWallet={isPending}
+          confirming={receipt.isLoading}
+          hash={hash}
+          combined={false}
+        />
+        {registered && hash && <TxHashLink hash={hash} />}
         {isError && (
           <span className="text-xs" style={{ color: "var(--err)" }}>
             {error instanceof Error ? error.message : String(error)}
+          </span>
+        )}
+        {receipt.isError && (
+          <span className="text-xs" style={{ color: "var(--err)" }}>
+            The registration transaction failed on-chain. You can try again.
           </span>
         )}
       </div>
@@ -439,7 +462,11 @@ function FundingPanel({
           </span>
           <div className="flex-1">
             <p className="text-sm" style={{ color: "var(--text)" }}>
-              Allow the campaign factory to move your tokens
+              Allow the campaign factory to move your tokens as an operator
+              <InfoTip
+                label="Operator"
+                note="An address your token explicitly allows to move funds on your behalf — revocable, time-limited."
+              />
             </p>
             {isOperator.isLoading && (
               <p className="text-xs" style={{ color: "var(--text-faint)" }}>
@@ -448,7 +475,8 @@ function FundingPanel({
             )}
             {!isOperator.isLoading && approved && (
               <p className="text-xs" style={{ color: "var(--ok)" }}>
-                Factory approved to move your tokens.
+                Factory approved to move your tokens.{" "}
+                {setOperator.data?.txHash && <TxHashLink hash={setOperator.data.txHash} />}
               </p>
             )}
           </div>
@@ -463,6 +491,9 @@ function FundingPanel({
             </button>
           )}
         </div>
+        {/* The Zama setOperator mutation only resolves once the tx is mined,
+            so wallet-approval vs confirming can't be told apart mid-flight. */}
+        <TxStatusLine awaitingWallet={setOperator.isPending} className="ml-9" />
         {setOperator.isError && (
           <p className="text-xs" style={{ color: "var(--err)" }}>
             {setOperator.error instanceof Error ? setOperator.error.message : String(setOperator.error)}
@@ -487,11 +518,14 @@ function FundingPanel({
             {fund.isPending ? "Funding…" : "Fund campaign"}
           </button>
         </div>
+        {/* The fund mutation resolves with the tx hash only on success — no
+            intermediate hash is observable, hence the combined message. */}
+        <TxStatusLine awaitingWallet={fund.isPending} className="ml-9" />
       </div>
 
-      {fund.isSuccess && (
+      {fund.isSuccess && fund.data && (
         <p className="mt-3 text-sm" style={{ color: "var(--ok)" }}>
-          Funding transaction submitted.
+          Funding transaction submitted. <TxHashLink hash={fund.data} />
         </p>
       )}
       {fundError && (

@@ -8,6 +8,7 @@ import { isSepoliaChainId, SEPOLIA_CHAIN_ID } from "@/lib/packet";
 import { formatConfidentialAmount, describeDecryptError } from "@/lib/confidential";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import { TokenSelect } from "@/components/TokenSelect";
+import { InfoTip } from "@/components/InfoTip";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -100,8 +101,12 @@ export function VerifyPanel({ initialToken, onVerified }: VerifyPanelProps) {
       )}
 
       <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
-        Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer — the plaintext
-        balance never leaves your browser.
+        Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer
+        <InfoTip
+          label="Zama relayer"
+          note="The service that helps your browser encrypt and decrypt values — it never sees your keys or plaintext without your signature."
+        />
+        — the plaintext balance never leaves your browser.
       </p>
     </div>
   );
