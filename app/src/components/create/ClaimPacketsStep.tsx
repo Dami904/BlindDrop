@@ -3,11 +3,19 @@
 import { useState } from "react";
 import { useZamaSDK } from "@zama-fhe/react-sdk";
 import { encryptUint64, useSignClaimAuthorization } from "@tokenops/sdk/fhe-airdrop/react";
+import { asEncryptedHandle, createConfidentialAirdropClient } from "@tokenops/sdk/fhe-airdrop";
+import { usePublicClient } from "wagmi";
 import type { Address, Hex } from "viem";
 import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet";
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
+import {
+  buildReportCsv,
+  buildReportJson,
+  type ClaimStatus,
+  type ReportRecipientRow,
+} from "@/lib/report";
 
 interface ClaimPacketsStepProps {
   recipients: RecipientRow[];
@@ -73,6 +81,19 @@ function downloadJson(filename: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
+function downloadText(filename: string, text: string, mimeType: string) {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** How many concurrent claim-status reads to run at once — same rationale as ENCRYPT_CONCURRENCY. */
+const STATUS_CHECK_CONCURRENCY = 5;
+
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
@@ -80,6 +101,7 @@ function shortAddress(address: string) {
 export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps) {
   const zamaSDK = useZamaSDK();
   const sign = useSignClaimAuthorization();
+  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID });
 
   const [packets, setPackets] = useState<GeneratedPacket[]>([]);
   const [stage, setStage] = useState<"encrypting" | "signing" | null>(null);
@@ -100,6 +122,13 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [signTotal, setSignTotal] = useState(0);
   const [signProgress, setSignProgress] = useState(0);
   const [signingCurrent, setSigningCurrent] = useState<RecipientRow | null>(null);
+
+  // Live claim status, keyed by lowercased recipient address. Manual refresh
+  // only — never polled automatically. `null` means "not checked yet".
+  const [claimStatus, setClaimStatus] = useState<Map<string, ClaimStatus>>(new Map());
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const total = recipients.length;
   const packetsByAddress = new Map(packets.map((p) => [p.address.toLowerCase(), p]));
@@ -241,6 +270,92 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
     downloadJson(`claim-packets-${deployed.airdrop}.json`, packets.map((p) => p.packet));
   }
 
+  /**
+   * Checks on-chain claim status for every generated packet. Uses
+   * `isSignatureClaimed(user, encryptedAmountHandle)` — the SDK's docs
+   * recommend it over the lower-level `claimedSignatures(signatureHash)`
+   * for exactly this shape of call, since it computes the struct hash for
+   * us from data we already have in the packet (no server-side indexer
+   * needed to pre-compute a hash). Manual-only: never called automatically.
+   * Per-recipient failures are reported as "unknown" rather than aborting
+   * the whole batch, matching the encryption pool's failure handling above.
+   */
+  async function refreshStatuses() {
+    if (!publicClient || packets.length === 0 || isRefreshingStatus) return;
+    setStatusError(null);
+    setIsRefreshingStatus(true);
+    try {
+      const airdrop = createConfidentialAirdropClient({
+        publicClient,
+        address: deployed.airdrop,
+      });
+
+      const next = new Map(claimStatus);
+      await runWithConcurrency(
+        packets,
+        STATUS_CHECK_CONCURRENCY,
+        async (gp) =>
+          airdrop.isSignatureClaimed(gp.address, asEncryptedHandle(gp.packet.encryptedInput.handle)),
+        (gp, result) => {
+          if (result.ok) {
+            next.set(gp.address.toLowerCase(), result.value ? "claimed" : "unclaimed");
+          } else {
+            next.set(gp.address.toLowerCase(), "unknown");
+          }
+        }
+      );
+      setClaimStatus(next);
+      setLastRefreshedAt(new Date());
+    } catch (err) {
+      setStatusError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  }
+
+  const claimedCount = packets.filter(
+    (p) => claimStatus.get(p.address.toLowerCase()) === "claimed"
+  ).length;
+
+  function buildReportRows(): ReportRecipientRow[] {
+    const amountByAddress = new Map(recipients.map((r) => [r.address.toLowerCase(), r.amount]));
+    return packets.map((gp) => {
+      const status = claimStatus.get(gp.address.toLowerCase());
+      return {
+        address: gp.address,
+        amount: amountByAddress.get(gp.address.toLowerCase()) ?? "",
+        email: emailByAddress.get(gp.address.toLowerCase()),
+        claimLink: buildClaimLink(window.location.origin, gp.packet),
+        status: status ?? "not-checked",
+      };
+    });
+  }
+
+  function reportMeta() {
+    return {
+      campaignAddress: deployed.airdrop,
+      tokenAddress: deployed.token,
+      chainId: SEPOLIA_CHAIN_ID,
+      claimWindowStart: deployed.startTimestamp
+        ? new Date(deployed.startTimestamp * 1000).toISOString()
+        : undefined,
+      claimWindowEnd: deployed.endTimestamp
+        ? new Date(deployed.endTimestamp * 1000).toISOString()
+        : undefined,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  function downloadReportCsv() {
+    const csv = buildReportCsv(reportMeta(), buildReportRows());
+    downloadText(`campaign-report-${deployed.airdrop}.csv`, csv, "text/csv");
+  }
+
+  function downloadReportJson() {
+    const json = buildReportJson(reportMeta(), buildReportRows());
+    downloadJson(`campaign-report-${deployed.airdrop}.json`, json);
+  }
+
   const encryptDone = stage === null || stage === "signing";
 
   return (
@@ -342,14 +457,65 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-md)] border p-3" style={{ borderColor: "var(--line)" }}>
+            <div className="text-xs" style={{ color: "var(--text-dim)" }}>
+              {lastRefreshedAt ? (
+                <>
+                  {claimedCount} of {packets.length} claimed{" "}
+                  <span style={{ color: "var(--text-faint)" }}>
+                    (as of {lastRefreshedAt.toLocaleTimeString()})
+                  </span>
+                </>
+              ) : (
+                <>Claim status hasn&apos;t been checked yet.</>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshStatuses()}
+              disabled={isRefreshingStatus || !publicClient}
+              className="btn btn-ghost text-xs"
+            >
+              {isRefreshingStatus ? "Refreshing…" : "Refresh statuses"}
+            </button>
+          </div>
+          {statusError && <p className="text-xs" style={{ color: "var(--err)" }}>{statusError}</p>}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={downloadReportCsv} className="btn btn-ghost text-xs">
+              Download report (CSV)
+            </button>
+            <button type="button" onClick={downloadReportJson} className="btn btn-ghost text-xs">
+              Download report (JSON)
+            </button>
+          </div>
+          <p className="text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            Your local record — contains the full recipient list, so store it as carefully as the
+            list itself.
+          </p>
+
           <div className="grid gap-3 sm:grid-cols-2">
             {packets.map((gp) => {
               const email = emailByAddress.get(gp.address.toLowerCase());
+              const status = claimStatus.get(gp.address.toLowerCase());
               return (
                 <div key={gp.address} className="envelope-card">
                   <div className="envelope-flap" aria-hidden />
                   <div className="relative z-10 p-4 pt-12">
-                    <p className="eyebrow">Sealed packet</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="eyebrow">Sealed packet</p>
+                      {status === "claimed" ? (
+                        <span className="badge badge-ok">Claimed ✓</span>
+                      ) : status === "unknown" ? (
+                        <span className="badge" style={{ borderColor: "var(--line)", color: "var(--text-faint)" }}>
+                          Unknown
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ borderColor: "var(--line)", color: "var(--text-dim)" }}>
+                          Unclaimed
+                        </span>
+                      )}
+                    </div>
                     <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text)" }}>
                       {gp.address}
                     </p>
