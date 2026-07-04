@@ -60,15 +60,15 @@ export function NavBar() {
           })}
         </div>
         <div className="flex min-w-0 shrink items-center gap-2">
-          <ThemeToggle className="hidden min-[480px]:inline-flex" />
-          <NetworkBadge className="hidden min-[480px]:inline-flex" />
+          <ThemeToggle className="!hidden min-[480px]:!inline-flex" />
+          <NetworkBadge className="!hidden min-[480px]:!inline-flex" />
           <ConnectButton />
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
-            className="btn btn-ghost px-2.5 py-2.5 min-[480px]:hidden"
+            className="btn btn-ghost px-2.5 py-2.5 min-[480px]:!hidden"
           >
             <MenuIcon open={open} />
           </button>
