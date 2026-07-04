@@ -37,7 +37,7 @@ export function NavBar() {
         >
           Blind<span style={{ color: "var(--seal)" }}>Drop</span>
         </Link>
-        <div className="hidden items-center gap-1 sm:flex">
+        <div className="hidden items-center gap-1 min-[480px]:flex">
           {links.map((link) => {
             const active = pathname === link.href;
             return (
@@ -60,15 +60,15 @@ export function NavBar() {
           })}
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle className="hidden sm:inline-flex" />
-          <NetworkBadge className="hidden sm:inline-flex" />
+          <ThemeToggle className="hidden min-[480px]:inline-flex" />
+          <NetworkBadge className="hidden min-[480px]:inline-flex" />
           <ConnectButton />
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
-            className="btn btn-ghost px-2.5 py-2.5 sm:hidden"
+            className="btn btn-ghost px-2.5 py-2.5 min-[480px]:hidden"
           >
             <MenuIcon open={open} />
           </button>
@@ -77,7 +77,7 @@ export function NavBar() {
 
       {open && (
         <div
-          className="border-t px-6 py-3 sm:hidden"
+          className="border-t px-6 py-3 min-[480px]:hidden"
           style={{ borderColor: "var(--line)", background: "var(--ink-1)" }}
         >
           <div className="flex flex-col gap-1">
