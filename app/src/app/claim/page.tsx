@@ -50,8 +50,9 @@ function ClaimContent() {
       <p className="eyebrow">Recipient intake</p>
       <h1 className="font-display mt-2 text-3xl">Claim Tokens</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
-        Open the claim packet your airdrop admin gave you, then submit it from the connected
-        wallet it was issued to.
+        You&apos;re about to claim a hidden amount — then privately reveal it to yourself. Nobody
+        else can see it. Open the claim packet your airdrop admin gave you, then submit it from
+        the connected wallet it was issued to.
       </p>
 
       <div className="mt-8">

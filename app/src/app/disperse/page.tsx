@@ -6,7 +6,7 @@ import type { Address } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useQueryClient } from "@tanstack/react-query";
-import { useZamaSDK } from "@zama-fhe/react-sdk";
+import { useMetadata, useZamaSDK } from "@zama-fhe/react-sdk";
 import {
   useIsRegistered,
   useRegister,
@@ -29,8 +29,109 @@ import {
 } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanTxUrl } from "@/lib/packet";
+import { formatConfidentialAmount } from "@/lib/confidential";
 
 const CONFIDENTIAL_DECIMALS = 6;
+
+interface DisperseReceipt {
+  token: { address: string; name?: string; symbol?: string };
+  recipientCount: number;
+  totalAmountHuman: string;
+  totalAmountRawUnits: string;
+  txHash: string;
+  etherscanUrl: string;
+  /** ISO timestamp of when the disperse transaction was submitted. */
+  timestamp: string;
+  note: string;
+}
+
+function downloadJson(filename: string, data: unknown) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Receipt card shown once a disperse transaction succeeds — token identity,
+ * recipient count, total (human units), tx hash/link, and a timestamp. The
+ * amounts here are the sender's local record only; on-chain the transfer
+ * amounts remain FHE-encrypted.
+ */
+function DisperseReceiptCard({ receipt }: { receipt: DisperseReceipt }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyReceipt() {
+    navigator.clipboard?.writeText(JSON.stringify(receipt, null, 2));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <div className="envelope-card mt-4">
+      <div className="envelope-flap" aria-hidden />
+      <div className="relative z-10 p-5 pt-12">
+        <p className="eyebrow">Disperse receipt</p>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <dt style={{ color: "var(--text-dim)" }}>Token</dt>
+            <dd className="font-data text-right" style={{ color: "var(--text)" }}>
+              {receipt.token.symbol ? `${receipt.token.symbol} · ` : ""}
+              {receipt.token.address.slice(0, 6)}…{receipt.token.address.slice(-4)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt style={{ color: "var(--text-dim)" }}>Recipients</dt>
+            <dd className="tabular" style={{ color: "var(--text)" }}>
+              {receipt.recipientCount}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt style={{ color: "var(--text-dim)" }}>Total amount</dt>
+            <dd className="font-data tabular" style={{ color: "var(--text)" }}>
+              {receipt.totalAmountHuman}
+              {receipt.token.symbol ? ` ${receipt.token.symbol}` : ""}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt style={{ color: "var(--text-dim)" }}>Transaction</dt>
+            <dd>
+              <a href={receipt.etherscanUrl} target="_blank" rel="noreferrer" className="link-gold font-data">
+                {receipt.txHash.slice(0, 10)}…
+              </a>
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt style={{ color: "var(--text-dim)" }}>Timestamp</dt>
+            <dd className="font-data text-xs" style={{ color: "var(--text)" }}>
+              {receipt.timestamp}
+            </dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 flex gap-3">
+          <button type="button" onClick={copyReceipt} className="btn btn-ghost text-xs">
+            {copied ? "Copied!" : "Copy receipt"}
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadJson(`disperse-receipt-${receipt.txHash}.json`, receipt)}
+            className="btn btn-gold text-xs"
+          >
+            Download receipt
+          </button>
+        </div>
+
+        <p className="mt-4 text-xs" style={{ color: "var(--text-faint)" }}>
+          {receipt.note}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function isHexAddress(value: string): value is Address {
   return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
@@ -109,6 +210,13 @@ export default function DispersePage() {
   const [tokenInput, setTokenInput] = useState(defaultToken);
   const tokenValid = isHexAddress(tokenInput);
   const token = tokenValid ? (tokenInput as Address) : undefined;
+  // Metadata for the receipt's token name/symbol/decimals — safe to call with
+  // a placeholder address since the query is disabled until a real token exists.
+  const tokenMetadata = useMetadata(token ?? ("0x0000000000000000000000000000000000000000" as Address), {
+    enabled: !!token,
+  });
+
+  const [receipt, setReceipt] = useState<DisperseReceipt | null>(null);
 
   const [entries, setEntries] = useState<RecipientEntry[]>([newRecipientEntry()]);
   const validated = useMemo(() => validateRecipientEntries(entries), [entries]);
@@ -334,12 +442,30 @@ export default function DispersePage() {
             )}
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!token) return;
+                const decimals = tokenMetadata.data?.decimals ?? CONFIDENTIAL_DECIMALS;
+                const symbol = tokenMetadata.data?.symbol;
                 disperse.mutate(
                   { token, mode: "wallet", recipients, amounts },
-                  { onSuccess: invalidateDisperseQueries }
-                )
-              }
+                  {
+                    onSuccess: (data) => {
+                      invalidateDisperseQueries();
+                      setReceipt({
+                        token: { address: token, name: tokenMetadata.data?.name, symbol },
+                        recipientCount: recipients.length,
+                        totalAmountHuman: formatConfidentialAmount(totalAmountUnits, decimals),
+                        totalAmountRawUnits: totalAmountUnits.toString(),
+                        txHash: data.hash,
+                        etherscanUrl: etherscanTxUrl(data.hash),
+                        timestamp: new Date().toISOString(),
+                        note:
+                          "Amounts in this receipt are your local record only — on-chain, transfer amounts remain FHE-encrypted.",
+                      });
+                    },
+                  }
+                );
+              }}
               disabled={!canSubmit}
               className="btn btn-gold"
             >
@@ -359,6 +485,7 @@ export default function DispersePage() {
                 {disperse.error?.message ?? "Disperse failed."}
               </p>
             )}
+            {receipt && <DisperseReceiptCard receipt={receipt} />}
           </Section>
         </>
       )}

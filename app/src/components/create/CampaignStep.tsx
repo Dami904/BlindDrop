@@ -231,6 +231,10 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
               className="mb-3 text-sm"
             />
           )}
+          <p className="mb-3 text-xs" style={{ color: "var(--text-faint)" }}>
+            Deploying takes two wallet transactions (deploy + fund). Sealing packets costs no
+            gas — only signatures.
+          </p>
           <button
             type="button"
             onClick={handleDeploy}

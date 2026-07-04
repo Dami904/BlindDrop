@@ -1,21 +1,48 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   newRecipientEntry,
   parseRecipientsCsv,
   scaleAmountToUnits,
   validateRecipientEntries,
   type RecipientEntry,
+  type RecipientRowError,
 } from "@/lib/csv";
 import { formatConfidentialAmount } from "@/lib/confidential";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
+/** localStorage key for the pre-deploy recipient draft. Never used for anything
+ * post-deploy — deployed campaign state, packets, and signatures are authorizations
+ * and must never touch storage. */
+const DRAFT_KEY = "blinddrop:create-draft:v1";
+
 interface RecipientsStepProps {
   entries: RecipientEntry[];
   onChange: (entries: RecipientEntry[]) => void;
   onNext: () => void;
+}
+
+function hasEntryContent(entries: RecipientEntry[]): boolean {
+  return entries.some((e) => e.address.trim() || e.amount.trim());
+}
+
+/** Best-effort split of a raw CSV/paste line into address/amount, even when
+ * the line failed validation — used to seed an editable ledger row so the
+ * visitor can fix the mistake in place instead of re-uploading the file. */
+function splitRawLine(raw: string): { address: string; amount: string } {
+  const parts = raw.trim().split(/[,\s\t]+/).filter(Boolean);
+  return { address: parts[0] ?? "", amount: parts[1] ?? "" };
+}
+
+/** Determines which field an entry's error message refers to, so the offending
+ * input (not just a generic row) gets the err-colored border. */
+function errorField(message: string | undefined): "address" | "amount" | undefined {
+  if (!message) return undefined;
+  if (/address/i.test(message)) return "address";
+  if (/amount|precise/i.test(message)) return "amount";
+  return undefined;
 }
 
 /** Compact × icon button for removing a recipient row — ghost by default, err-colored on hover/focus. */
@@ -26,6 +53,30 @@ function RemoveRecipientButton({ onClick }: { onClick: () => void }) {
         <path d="M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     </button>
+  );
+}
+
+function LockGlyph() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden className="shrink-0">
+      <rect x="3" y="6.5" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M4.5 6.5V4.5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+/** Inline privacy note shown at the point of input — a lock glyph plus one
+ * line, styled as an eyebrow rather than a boxed callout so it doesn't add
+ * visual weight to the ledger header. */
+function PrivacyNote() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[0.6875rem] tracking-wide"
+      style={{ color: "var(--text-faint)" }}
+    >
+      <LockGlyph />
+      This list stays in your browser until you seal it.
+    </span>
   );
 }
 
@@ -42,6 +93,44 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
   const [pasteText, setPasteText] = useState("");
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const restoredRef = useRef(false);
+
+  // Restore a saved draft on first mount — only when the ledger is still in
+  // its pristine, freshly-loaded state (a single blank row) so we never
+  // clobber content the visitor already typed this session.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (hasEntryContent(entries)) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as RecipientEntry[];
+      if (!Array.isArray(saved) || !hasEntryContent(saved)) return;
+      onChange(saved);
+    } catch {
+      // corrupt/foreign draft — ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist the draft, debounced ~500ms. Pre-deploy recipient entries only —
+  // never anything post-deploy (deployed campaign state, packets, signatures).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (hasEntryContent(entries)) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(entries));
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [entries]);
+
+  function clearDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    onChange([newRecipientEntry()]);
+  }
 
   const validated = useMemo(() => validateRecipientEntries(entries), [entries]);
   const totalAmountUnits = useMemo(
@@ -49,20 +138,30 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
     [validated.valid]
   );
 
-  function appendRows(rows: { address: string; amount: string }[], errors: string[]) {
-    if (rows.length > 0) {
-      onChange([...entries, ...rows.map((r) => ({ ...newRecipientEntry(), address: r.address, amount: r.amount }))]);
+  function appendRows(rows: { address: string; amount: string }[], errorRows: RecipientRowError[], duplicates: string[]) {
+    const newEntries: RecipientEntry[] = [
+      ...rows.map((r) => ({ ...newRecipientEntry(), address: r.address, amount: r.amount })),
+      // Failed rows become editable entries too, pre-filled with the raw
+      // (invalid) values, so the visitor can fix them in place instead of
+      // re-uploading the file.
+      ...errorRows.map((e) => {
+        const { address, amount } = splitRawLine(e.raw);
+        return { ...newRecipientEntry(), address, amount };
+      }),
+    ];
+    if (newEntries.length > 0) {
+      onChange([...entries, ...newEntries]);
     }
-    setImportErrors(errors);
+    const errs = [
+      ...errorRows.map((e) => `Line ${e.line}: ${e.message} — "${e.raw.trim()}"`),
+      ...duplicates.map((d) => `Duplicate skipped: ${d}`),
+    ];
+    setImportErrors(errs);
   }
 
   function handleParsedInput(text: string) {
     const result = parseRecipientsCsv(text);
-    const errs = [
-      ...result.errors.map((e) => `Line ${e.line}: ${e.message}`),
-      ...result.duplicates.map((d) => `Duplicate skipped: ${d}`),
-    ];
-    appendRows(result.rows, errs);
+    appendRows(result.rows, result.errors, result.duplicates);
   }
 
   function handleFile(file: File) {
@@ -206,6 +305,17 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
             + Add row
           </button>
         </div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <PrivacyNote />
+          {hasEntryContent(entries) && (
+            <span className="flex items-center gap-2 text-xs" style={{ color: "var(--text-faint)" }}>
+              Draft saved locally
+              <button type="button" onClick={clearDraft} className="link-gold">
+                Clear draft
+              </button>
+            </span>
+          )}
+        </div>
 
         {entries.length === 0 && (
           <p className="mt-3 rounded-[var(--r-md)] border px-3 py-6 text-center text-sm" style={{ borderColor: "var(--line)", color: "var(--text-faint)" }}>
@@ -218,6 +328,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
           <div className="mt-3 flex flex-col gap-2 sm:hidden">
             {entries.map((entry) => {
               const error = validated.errorsById[entry.id];
+              const badField = errorField(error);
               return (
                 <div key={entry.id} className="panel p-3">
                   <label className="label">Address</label>
@@ -226,6 +337,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                     onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
                     placeholder="0x..."
                     className="field font-data mt-1 text-xs"
+                    style={badField === "address" ? { borderColor: "var(--err)" } : undefined}
                   />
                   <div className="mt-2 flex items-end gap-2">
                     <div className="flex-1">
@@ -235,6 +347,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                         onChange={(e) => updateEntry(entry.id, { amount: e.target.value })}
                         placeholder="0.0"
                         className="field tabular mt-1"
+                        style={badField === "amount" ? { borderColor: "var(--err)" } : undefined}
                       />
                     </div>
                     <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
@@ -268,52 +381,45 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
               <tbody>
                 {entries.map((entry) => {
                   const error = validated.errorsById[entry.id];
+                  const badField = errorField(error);
                   return (
-                    <tr key={entry.id} className="border-t" style={{ borderColor: "var(--line)" }}>
-                      <td className="px-3 py-1.5">
-                        <input
-                          value={entry.address}
-                          onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
-                          placeholder="0x..."
-                          className="font-data w-full rounded border border-transparent bg-transparent px-2 py-1 text-xs focus:outline-none"
-                          style={{ color: "var(--text)" }}
-                        />
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <input
-                          value={entry.amount}
-                          onChange={(e) => updateEntry(entry.id, { amount: e.target.value })}
-                          placeholder="0.0"
-                          className="tabular w-28 rounded border border-transparent bg-transparent px-2 py-1 focus:outline-none"
-                          style={{ color: "var(--text)" }}
-                        />
-                      </td>
-                      <td className="px-3 py-1.5 text-right">
-                        <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
-                      </td>
-                      {error && (
-                        <td className="hidden" aria-hidden>
-                          {error}
+                    <Fragment key={entry.id}>
+                      <tr className="border-t" style={{ borderColor: "var(--line)" }}>
+                        <td className="px-3 py-1.5">
+                          <input
+                            value={entry.address}
+                            onChange={(e) => updateEntry(entry.id, { address: e.target.value })}
+                            placeholder="0x..."
+                            className="font-data w-full rounded border bg-transparent px-2 py-1 text-xs focus:outline-none"
+                            style={{ color: "var(--text)", borderColor: badField === "address" ? "var(--err)" : "transparent" }}
+                          />
                         </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            value={entry.amount}
+                            onChange={(e) => updateEntry(entry.id, { amount: e.target.value })}
+                            placeholder="0.0"
+                            className="tabular w-28 rounded border bg-transparent px-2 py-1 focus:outline-none"
+                            style={{ color: "var(--text)", borderColor: badField === "amount" ? "var(--err)" : "transparent" }}
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right">
+                          <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
+                        </td>
+                      </tr>
+                      {error && (
+                        <tr style={{ borderColor: "var(--line)" }}>
+                          <td colSpan={3} className="px-3 pt-0 pb-1.5 text-xs" style={{ color: "var(--err)" }}>
+                            {error}
+                          </td>
+                        </tr>
                       )}
-                    </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        )}
-
-        {entries.some((e) => validated.errorsById[e.id]) && (
-          <ul className="mt-2 space-y-0.5 text-xs" style={{ color: "var(--err)" }}>
-            {entries.map((e) =>
-              validated.errorsById[e.id] ? (
-                <li key={e.id}>
-                  Row {e.address || "(blank)"}: {validated.errorsById[e.id]}
-                </li>
-              ) : null
-            )}
-          </ul>
         )}
       </div>
 
