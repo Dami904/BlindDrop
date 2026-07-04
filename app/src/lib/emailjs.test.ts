@@ -5,9 +5,11 @@ import {
   EMAILJS_STORAGE_KEY,
   isEmailJsConfigComplete,
   loadEmailJsConfig,
+  resolveEmailJsConfig,
   saveEmailJsConfig,
   sendClaimEmail,
   type EmailJsConfig,
+  type EmailJsEnvConfig,
   type KeyValueStorage,
 } from "./emailjs";
 
@@ -72,6 +74,64 @@ describe("config round-trip via injected storage", () => {
     const storage = memoryStorage();
     storage.setItem(EMAILJS_STORAGE_KEY, JSON.stringify({ serviceId: "only-this" }));
     expect(loadEmailJsConfig(storage)).toBeNull();
+  });
+});
+
+const ENV_CONFIG: EmailJsEnvConfig = {
+  serviceId: "service_env",
+  templateId: "template_env",
+  publicKey: "pk_env",
+};
+
+const OVERRIDE_CONFIG: EmailJsConfig = {
+  serviceId: "service_own",
+  templateId: "template_own",
+  publicKey: "pk_own",
+};
+
+describe("resolveEmailJsConfig", () => {
+  it("resolves to 'none' when neither env nor a saved config is present", () => {
+    const storage = memoryStorage();
+    const resolved = resolveEmailJsConfig({ env: {}, storage });
+    expect(resolved).toEqual({ config: null, source: "none", envConfigured: false });
+  });
+
+  it("falls back to the env config when no saved override exists", () => {
+    const storage = memoryStorage();
+    const resolved = resolveEmailJsConfig({ env: ENV_CONFIG, storage });
+    expect(resolved).toEqual({
+      config: { serviceId: "service_env", templateId: "template_env", publicKey: "pk_env" },
+      source: "env",
+      envConfigured: true,
+    });
+  });
+
+  it("prefers a complete saved override over the env config", () => {
+    const storage = memoryStorage();
+    saveEmailJsConfig(OVERRIDE_CONFIG, storage);
+    const resolved = resolveEmailJsConfig({ env: ENV_CONFIG, storage });
+    expect(resolved).toEqual({ config: OVERRIDE_CONFIG, source: "saved", envConfigured: true });
+  });
+
+  it("ignores an incomplete saved config and falls back to env", () => {
+    const storage = memoryStorage();
+    storage.setItem(EMAILJS_STORAGE_KEY, JSON.stringify({ ...OVERRIDE_CONFIG, publicKey: "" }));
+    const resolved = resolveEmailJsConfig({ env: ENV_CONFIG, storage });
+    expect(resolved.source).toBe("env");
+    expect(resolved.config).toEqual({ serviceId: "service_env", templateId: "template_env", publicKey: "pk_env" });
+  });
+
+  it("ignores a partial env config (missing fields count as unset)", () => {
+    const storage = memoryStorage();
+    const resolved = resolveEmailJsConfig({ env: { serviceId: "service_env" }, storage });
+    expect(resolved).toEqual({ config: null, source: "none", envConfigured: false });
+  });
+
+  it("is 'none' when neither source is complete, even with a saved-but-incomplete config", () => {
+    const storage = memoryStorage();
+    storage.setItem(EMAILJS_STORAGE_KEY, JSON.stringify({ serviceId: "only-this" }));
+    const resolved = resolveEmailJsConfig({ env: {}, storage });
+    expect(resolved).toEqual({ config: null, source: "none", envConfigured: false });
   });
 });
 

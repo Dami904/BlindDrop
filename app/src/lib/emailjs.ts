@@ -68,6 +68,73 @@ export function saveEmailJsConfig(config: EmailJsConfig, storage?: KeyValueStora
   store.setItem(EMAILJS_STORAGE_KEY, JSON.stringify(config));
 }
 
+/**
+ * The app-provided EmailJS config, baked in at build time via
+ * `NEXT_PUBLIC_*` env vars. Any/all of these may be `undefined` — e.g. an
+ * unconfigured deployment, or a fork run without the app's own EmailJS
+ * account.
+ */
+export interface EmailJsEnvConfig {
+  serviceId?: string;
+  templateId?: string;
+  publicKey?: string;
+}
+
+/** Reads the build-time env config. Only call this at the edge (component/hook) — kept out of `resolveEmailJsConfig` itself so tests can inject env values directly instead of stubbing `process.env`. */
+export function readEmailJsEnvConfig(): EmailJsEnvConfig {
+  return {
+    serviceId: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+    templateId: process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
+    publicKey: process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY,
+  };
+}
+
+export type EmailJsConfigSource = "saved" | "env" | "none";
+
+export interface ResolvedEmailJsConfig {
+  /** The config to send with, or `null` if neither source is complete. */
+  config: EmailJsConfig | null;
+  /** Which source `config` came from. */
+  source: EmailJsConfigSource;
+  /** True when the app ships a complete env-provided config, regardless of
+   * whether a saved override ends up winning. Drives whether the panel can
+   * hide its setup fields by default. */
+  envConfigured: boolean;
+}
+
+/**
+ * Resolves the EmailJS config to actually send with.
+ *
+ * Precedence: a complete user-saved (localStorage) config always wins —
+ * it's an explicit "use my own account" choice — otherwise the app-provided
+ * build-time env config is used as the default, so a normal admin never has
+ * to see or fill in a setup form.
+ *
+ * `env` and `storage` are both injectable so this is fully unit-testable
+ * without touching `process.env` or the real `localStorage`.
+ */
+export function resolveEmailJsConfig(options?: {
+  env?: EmailJsEnvConfig;
+  storage?: KeyValueStorage;
+}): ResolvedEmailJsConfig {
+  const env = options?.env ?? readEmailJsEnvConfig();
+  const envConfig: EmailJsConfig = {
+    serviceId: env.serviceId ?? "",
+    templateId: env.templateId ?? "",
+    publicKey: env.publicKey ?? "",
+  };
+  const envComplete = isEmailJsConfigComplete(envConfig);
+
+  const saved = loadEmailJsConfig(options?.storage);
+  if (isEmailJsConfigComplete(saved)) {
+    return { config: saved, source: "saved", envConfigured: envComplete };
+  }
+  if (envComplete) {
+    return { config: envConfig, source: "env", envConfigured: true };
+  }
+  return { config: null, source: "none", envConfigured: false };
+}
+
 export interface ClaimEmailInput {
   toEmail: string;
   claimLink: string;

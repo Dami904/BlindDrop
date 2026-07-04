@@ -124,3 +124,26 @@ export function clearPackets(airdropAddress: string): void {
     // ignore
   }
 }
+
+export function emailToggleStorageKey(airdropAddress: string): string {
+  return `blinddrop:email-toggle:v1:${airdropAddress.toLowerCase()}`;
+}
+
+/** Persists whether the "email claim links" toggle is on for this campaign — scoped per
+ * campaign so switching campaigns doesn't carry the choice over. */
+export function saveEmailToggle(airdropAddress: string, enabled: boolean): void {
+  try {
+    localStorage.setItem(emailToggleStorageKey(airdropAddress), enabled ? "1" : "0");
+  } catch {
+    // storage unavailable — the toggle just won't persist across reloads
+  }
+}
+
+/** Defaults to `false` (off) when nothing is stored yet. */
+export function loadEmailToggle(airdropAddress: string): boolean {
+  try {
+    return localStorage.getItem(emailToggleStorageKey(airdropAddress)) === "1";
+  } catch {
+    return false;
+  }
+}

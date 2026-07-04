@@ -10,14 +10,20 @@ import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
-import { clearPackets, loadPackets, savePackets } from "@/lib/create-storage";
+import { clearPackets, loadEmailToggle, loadPackets, saveEmailToggle, savePackets } from "@/lib/create-storage";
 import {
   buildReportCsv,
   buildReportJson,
   type ClaimStatus,
   type ReportRecipientRow,
 } from "@/lib/report";
-import { AutoSendPanel, AutoSendStatusChip, useAutoSend, type AutoSendRecipient } from "@/components/create/AutoSendPanel";
+import {
+  AutoSendPanel,
+  AutoSendStatusChip,
+  ToggleSwitch,
+  useAutoSend,
+  type AutoSendRecipient,
+} from "@/components/create/AutoSendPanel";
 
 interface ClaimPacketsStepProps {
   recipients: RecipientRow[];
@@ -138,6 +144,21 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   // stored record's timestamp, shown in the caption below the restored list.
   const restoredPacketsRef = useRef(false);
   const [sealedAt, setSealedAt] = useState<string | null>(null);
+
+  // Whether the "email claim links to recipients" toggle is on for this
+  // campaign — off by default, persisted per campaign so admins who don't
+  // want email UI at all never see it again after leaving it off.
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [copiedAllLinks, setCopiedAllLinks] = useState(false);
+
+  useEffect(() => {
+    setEmailEnabled(loadEmailToggle(deployed.airdrop));
+  }, [deployed.airdrop]);
+
+  function toggleEmailEnabled(next: boolean) {
+    setEmailEnabled(next);
+    saveEmailToggle(deployed.airdrop, next);
+  }
 
   useEffect(() => {
     if (restoredPacketsRef.current) return;
@@ -312,6 +333,17 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
     navigator.clipboard?.writeText(link);
     setCopiedLinkFor(gp.address);
     setTimeout(() => setCopiedLinkFor((c) => (c === gp.address ? null : c)), 1500);
+  }
+
+  /** Copies every sealed packet's address + claim link, one tab-separated pair per line —
+   * pastes cleanly into a spreadsheet for manual distribution. */
+  function copyAllClaimLinks() {
+    const lines = packets.map(
+      (gp) => `${gp.address}\t${buildClaimLink(window.location.origin, gp.packet)}`
+    );
+    navigator.clipboard?.writeText(lines.join("\n"));
+    setCopiedAllLinks(true);
+    setTimeout(() => setCopiedAllLinks(false), 1500);
   }
 
   // Native OS share sheet (WhatsApp/Telegram/SMS/…). Mobile-first: the button
@@ -517,12 +549,15 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             <p className="text-sm" style={{ color: "var(--text-dim)" }}>
               {packets.length} packet{packets.length === 1 ? "" : "s"} ready
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!isRunning && remaining.length > 0 && encryptFailures.length === 0 && (
                 <button type="button" onClick={() => void generate(remaining)} className="btn btn-ghost text-xs">
                   Generate remaining
                 </button>
               )}
+              <button type="button" onClick={copyAllClaimLinks} className="btn btn-ghost text-xs">
+                {copiedAllLinks ? `Copied ${packets.length} links!` : "Copy all claim links"}
+              </button>
               <button type="button" onClick={downloadAll} className="btn btn-gold text-xs">
                 Download all (JSON array)
               </button>
@@ -577,7 +612,15 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             list itself.
           </p>
 
-          <AutoSendPanel recipients={autoSendRecipients} auto={autoSend} />
+          <div className="panel p-4">
+            <ToggleSwitch
+              checked={emailEnabled}
+              onChange={toggleEmailEnabled}
+              label={<>📧 Email claim links to recipients</>}
+            />
+          </div>
+
+          {emailEnabled && <AutoSendPanel recipients={autoSendRecipients} auto={autoSend} />}
 
           <div className="grid gap-3 sm:grid-cols-2">
             {packets.map((gp) => {
@@ -604,11 +647,11 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                     <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text)" }}>
                       {gp.address}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-3">
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
                       <button
                         type="button"
                         onClick={() => copyClaimLink(gp)}
-                        className="link-gold text-xs"
+                        className="btn btn-ghost text-xs"
                       >
                         {copiedLinkFor === gp.address ? "Copied!" : "Copy claim link"}
                       </button>
@@ -637,7 +680,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                         Download JSON
                       </button>
                     </div>
-                    {email && (
+                    {emailEnabled && email && (
                       <div className="mt-2">
                         <div className="flex flex-wrap items-center gap-3">
                           <a href={mailtoHref(gp, email)} className="link-gold text-xs">
