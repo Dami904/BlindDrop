@@ -105,8 +105,10 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
     let emailRaw: string | undefined;
 
     if (headerMap) {
-      const maxIdx = Math.max(headerMap.addressIdx, headerMap.amountIdx, headerMap.emailIdx ?? 0);
-      if (parts.length <= maxIdx) {
+      // Only the address and amount columns are required — the email column,
+      // even when declared in the header, may be empty on any given row.
+      const requiredIdx = Math.max(headerMap.addressIdx, headerMap.amountIdx);
+      if (parts.length <= requiredIdx) {
         errors.push({ line, raw: rawLine, message: "Expected `address,amount`" });
         return;
       }

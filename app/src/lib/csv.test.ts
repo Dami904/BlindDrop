@@ -277,3 +277,23 @@ describe("describeAmountError", () => {
     expect(describeAmountError("-1")).toMatch(/Invalid amount/);
   });
 });
+
+describe("header with email column but email-less rows", () => {
+  const A1 = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  const A2 = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+
+  it("accepts rows missing the optional email cell (trailing comma or absent)", () => {
+    const raw = `address,amount,email\n${A1},10,\n${A2},25.5`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0].email).toBeUndefined();
+  });
+
+  it("still captures the email when present", () => {
+    const raw = `address,amount,email\n${A1},10,someone@example.com`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows[0].email).toBe("someone@example.com");
+  });
+});
