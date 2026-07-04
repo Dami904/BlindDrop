@@ -15,31 +15,32 @@ Film: screen recording of the live app + your webcam/voice. Rehearse once; keep 
 > "Amounts are encrypted in my browser before they ever leave it. On-chain, they're FHE ciphertexts —
 > only each recipient can decrypt their own. Let me show you the whole thing, live on Sepolia."
 
-**[0:40–1:30] Admin flow (Create page)**
-- Upload the CSV template (or type recipients manually — show the X-remove and the live total).
-- Point out the token picker: "any ERC-7984 confidential token — here's cUSDT from Zama's registry;
-  I'll use the test token." Show the token identity card verifying name/symbol/ERC-7984 badge and
-  the decrypt-your-balance row.
-- Deploy → approve → fund (narrate: "the campaign is a clone of TokenOps' OpenZeppelin-audited
-  contract — BlindDrop adds zero trust assumptions").
-- Generate claim packets: "encryption runs in parallel; each packet is bound to its recipient's
-  address — stolen packets are useless. And notice what's NOT happening: no list is uploaded
-  anywhere. There is no backend."
+**[0:40–1:35] Admin flow (Create page)**
+- Upload the CSV template with the email column (or type recipients manually — show the live total
+  and inline row validation).
+- Token picker: "any ERC-7984 confidential token — here's cUSDT from Zama's registry; I'll use the
+  test token." Show the identity card (name/symbol/ERC-7984 ✓) and the decrypt-your-balance check.
+- Deploy → name the campaign → approve → fund (narrate: "the campaign is a clone of TokenOps'
+  OpenZeppelin-audited contract — BlindDrop adds zero trust assumptions").
+- Seal packets (parallel encryption), then the delivery moment: flip the email toggle → **"Send
+  all"** → "every recipient just got their private claim link. No list was uploaded anywhere.
+  There is no backend." Show the claim-status chips ("this is how I'll watch claims come in") and
+  the report download.
 
-**[1:30–2:15] Recipient flow (switch wallet, Claim & Verify page)**
-- Load the claim packet (drag & drop), claim, show the stepper advancing.
-- The reveal: decrypt the balance with the EIP-712 signature — linger one beat on the unseal
-  animation. "That decryption happened in my browser. The admin can't do this. Etherscan can't.
-  Only me."
-- Quick cut to Etherscan: show the claim tx — "here's the same transfer on-chain: the amount is a
-  ciphertext handle."
+**[1:35–2:20] Recipient flow (switch wallet, open the emailed claim link)**
+- Click the link from the email — packet loads itself.
+- **The money shot:** "Reveal amount" on the allocation row — one small transaction, one
+  signature, and the sealed bar unseals to the exact figure. "I can see exactly what I was sent —
+  before I even claim it. The admin can't see my balance. Etherscan can't. Only me."
+- Claim (stepper advances), then quick cut to Etherscan: "the same transfer on-chain — the amount
+  is a ciphertext handle."
 
-**[2:15–2:40] Breadth (fast cuts)**
-- Disperse page: "push-based payouts for teams and investors — same confidentiality, no claim step."
-- Faucet section + Archivist guide widget: "judges can self-serve test tokens and be walked through
-  the whole journey."
-- Registry: "campaigns are indexed by our own on-chain registry contract — reload-safe, and it
-  stores only what's already public."
+**[2:20–2:45] Breadth (fast cuts)**
+- Disperse: "the push model — payroll for any list size in one transaction, nothing to claim."
+- Campaign cards: "my campaigns, indexed by our own on-chain registry contract — and where other
+  apps print totals and recipient counts, ours shows sealed bars, because that data isn't on-chain
+  to leak."
+- Faucet + Archivist guide widget: "judges can self-serve tokens and be walked through everything."
 
 **[2:40–3:00] Close (face to camera)**
 > "BlindDrop: airdrops, investor distributions, and payouts — private at scale, on the audited
