@@ -711,3 +711,21 @@ body {
     transition: none;
   }
 }
+
+/* Claim-packet drop zone: alive at idle, not just mid-drag */
+.drop-zone:hover {
+  border-color: var(--gold);
+  background: var(--gold-dim);
+  box-shadow: var(--shadow-card);
+}
+.drop-zone .drop-zone-icon {
+  transition: transform var(--dur-med) var(--ease-overshoot);
+}
+.drop-zone:hover .drop-zone-icon {
+  transform: translateY(-3px) rotate(-4deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop-zone:hover .drop-zone-icon {
+    transform: none;
+  }
+}

@@ -194,17 +194,21 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
             setIsDragging(false);
             void onFileChange(e.dataTransfer.files?.[0]);
           }}
-          className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--r-lg)] border-2 border-dashed px-6 py-12 text-center transition-colors"
+          className="drop-zone flex cursor-pointer items-center justify-center gap-4 rounded-[var(--r-lg)] border-2 border-dashed px-6 py-6 text-center transition-all"
           style={{
             borderColor: isDragging ? "var(--gold)" : "var(--line-strong)",
             background: isDragging ? "var(--gold-dim)" : "var(--ink-2)",
           }}
         >
-          <EnvelopeIcon />
-          <p className="font-display text-base">Drop your claim packet here</p>
-          <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-            .json file, or click to browse
-          </p>
+          <span className="drop-zone-icon inline-flex shrink-0">
+            <EnvelopeIcon />
+          </span>
+          <span className="text-left">
+            <span className="font-display block text-base">Drop your claim packet here</span>
+            <span className="block text-xs" style={{ color: "var(--text-dim)" }}>
+              .json file or claim link — or click to browse
+            </span>
+          </span>
           <input
             type="file"
             accept="application/json,.json,.txt"
