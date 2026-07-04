@@ -6,7 +6,7 @@ import type { Address } from "viem";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMetadata, useZamaSDK } from "@zama-fhe/react-sdk";
+import { useMetadata, useZamaSDK, useConfidentialIsOperator, useConfidentialSetOperator } from "@zama-fhe/react-sdk";
 import {
   useIsRegistered,
   useRegister,
@@ -15,7 +15,7 @@ import {
   usePreflightDisperse,
   useDisperse,
 } from "@tokenops/sdk/fhe-disperse/react";
-import { getConfidentialTestTokenAddress } from "@tokenops/sdk";
+import { getConfidentialTestTokenAddress, getFheDisperseSingletonAddress } from "@tokenops/sdk";
 import { DisperseRecipients } from "@/components/disperse/DisperseRecipients";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import { TokenAmountSummary } from "@/components/TokenAmountSummary";
@@ -137,6 +137,22 @@ function isHexAddress(value: string): value is Address {
   return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
 }
 
+/**
+ * Map a disperse-mutation error to a plain-language message. The disperse
+ * singleton pulls the encrypted total from the caller's own wallet via an
+ * ERC-7984 operator transfer before fanning it out to the sub-wallets — if
+ * the caller never granted the singleton operator status on the token, the
+ * transaction reverts with `ERC7984UnauthorizedSpender(address,address)`
+ * (selector `0x79f2cb38`).
+ */
+function describeDisperseError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  if (raw.includes("79f2cb38") || raw.includes("UnauthorizedSpender")) {
+    return "The disperse contract isn't approved to move your tokens yet — complete the approval step above.";
+  }
+  return raw;
+}
+
 type SectionState = "idle" | "active" | "done";
 
 /**
@@ -246,6 +262,23 @@ export default function DispersePage() {
   });
   const approve = useApproveTokenOnWallets();
 
+  // The disperse SINGLETON (not the sub-wallets) pulls the encrypted total
+  // out of the caller's own wallet via an ERC-7984 operator transfer before
+  // splitting it across the sub-wallets — so the caller must separately
+  // grant the singleton operator status on the token. `usePreflightDisperse`
+  // does NOT surface this for wallet-mode disperses (its `hasApprovedSingleton`
+  // field is only populated for `mode: "direct"`), so this is checked
+  // independently here.
+  const singletonAddress = isSepoliaChainId(chainId)
+    ? getFheDisperseSingletonAddress(SEPOLIA_CHAIN_ID)
+    : undefined;
+  const isSingletonOperator = useConfidentialIsOperator({
+    address: token,
+    spender: singletonAddress,
+    holder: address,
+  });
+  const setSingletonOperator = useConfidentialSetOperator(token ?? ("0x0000000000000000000000000000000000000000" as Address));
+
   const preflight = usePreflightDisperse({
     user: address,
     token,
@@ -258,11 +291,14 @@ export default function DispersePage() {
     encryptor: () => toTokenOpsEncryptor(zamaSDK.relayer),
   });
 
+  const singletonApprovedDone = isSingletonOperator.data === true;
+
   const canSubmit =
     ready &&
     !!token &&
     recipients.length > 0 &&
     !!preflight.data?.ready &&
+    singletonApprovedDone &&
     !disperse.isPending;
 
   // Section 1: setup (token + recipients). "Done" once there's a valid
@@ -418,11 +454,62 @@ export default function DispersePage() {
 
           <Section
             n={4}
-            title="Disperse"
-            state={disperseDone ? "done" : approvedDone ? "active" : "idle"}
-            summary={disperseDone && disperse.data ? `Sent · ${disperse.data.hash.slice(0, 10)}…` : undefined}
-            open={sectionOpen(4, disperseDone)}
+            title="Allow the disperse contract to move your tokens"
+            state={singletonApprovedDone ? "done" : approvedDone ? "active" : "idle"}
+            summary={singletonApprovedDone ? "Approved" : undefined}
+            open={sectionOpen(4, singletonApprovedDone)}
             onOpenChange={(o) => setSectionOpen(4, o)}
+          >
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              One-time approval so the disperse contract can take the total from your wallet
+              and fan it out — expires after an hour. This is separate from the wallet-pair
+              approval above: the disperse contract itself must be allowed to pull from your
+              wallet before it can split funds across your registered wallets.
+            </p>
+            {approvedDone && isSingletonOperator.isLoading && (
+              <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
+                Checking approval status…
+              </p>
+            )}
+            {approvedDone && !isSingletonOperator.isLoading && singletonApprovedDone && (
+              <p className="mt-2 text-xs" style={{ color: "var(--ok)" }}>
+                Disperse contract approved to move your tokens.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (!token || !singletonAddress) return;
+                setSingletonOperator.mutate(
+                  { operator: singletonAddress, until: Math.floor(Date.now() / 1000) + 3600 },
+                  { onSuccess: () => isSingletonOperator.refetch() }
+                );
+              }}
+              disabled={!approvedDone || singletonApprovedDone || setSingletonOperator.isPending || !singletonAddress}
+              className="btn btn-seal mt-3"
+            >
+              {singletonApprovedDone
+                ? "Approved"
+                : setSingletonOperator.isPending
+                  ? "Approving…"
+                  : "Approve disperse contract"}
+            </button>
+            {setSingletonOperator.isError && (
+              <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
+                {setSingletonOperator.error instanceof Error
+                  ? setSingletonOperator.error.message
+                  : String(setSingletonOperator.error)}
+              </p>
+            )}
+          </Section>
+
+          <Section
+            n={5}
+            title="Disperse"
+            state={disperseDone ? "done" : singletonApprovedDone ? "active" : "idle"}
+            summary={disperseDone && disperse.data ? `Sent · ${disperse.data.hash.slice(0, 10)}…` : undefined}
+            open={sectionOpen(5, disperseDone)}
+            onOpenChange={(o) => setSectionOpen(5, o)}
           >
             {preflight.data && !preflight.data.ready && preflight.data.blockerErrors.length > 0 && (
               <ul className="mb-3 list-inside list-disc space-y-0.5 text-xs" style={{ color: "var(--warn)" }}>
@@ -482,7 +569,7 @@ export default function DispersePage() {
             )}
             {disperse.isError && (
               <p className="callout callout-err mt-3 text-xs">
-                {disperse.error?.message ?? "Disperse failed."}
+                {disperse.error ? describeDisperseError(disperse.error) : "Disperse failed."}
               </p>
             )}
             {receipt && <DisperseReceiptCard receipt={receipt} />}
