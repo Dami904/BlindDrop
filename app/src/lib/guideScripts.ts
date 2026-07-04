@@ -14,7 +14,7 @@ export interface GuideStep {
 }
 
 export const JOURNEY_STEPS: { step: number; label: string; href: string }[] = [
-  { step: 1, label: "Fund", href: "/#faucet" },
+  { step: 1, label: "Tokens", href: "/#faucet" },
   { step: 2, label: "Create", href: "/create" },
   { step: 3, label: "Packets", href: "/create" },
   { step: 4, label: "Claim", href: "/claim" },

@@ -8,6 +8,13 @@ FHE-encrypted end-to-end (ERC-7984), the recipient list never touches the chain,
 recipient can verify and decrypt **their own** allocation — no one else can, not even the
 distribution admin.
 
+![BlindDrop home — every allocation, sealed until opened](docs/screenshots/home.png)
+
+<p align="center">
+  <img src="docs/screenshots/create.png" width="49%" alt="Create wizard — recipients ledger" />
+  <img src="docs/screenshots/claim.png" width="49%" alt="Claim & Verify — packet drop-zone and allocation reveal" />
+</p>
+
 ## The 5-minute judge journey
 
 1. **Home → "Get test tokens"** — mint the CTTT confidential test token to your wallet.

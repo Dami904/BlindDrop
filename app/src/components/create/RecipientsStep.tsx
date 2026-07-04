@@ -66,6 +66,19 @@ function LockGlyph() {
   );
 }
 
+/** Sealed-envelope glyph for the empty ledger — reuses the envelope + wax-seal
+ * motif rather than an image, kept quiet (text-faint) since it marks an
+ * absence, not an action. */
+function EmptyLedgerGlyph() {
+  return (
+    <svg width="30" height="22" viewBox="0 0 30 22" fill="none" aria-hidden>
+      <rect x="1" y="1" width="28" height="20" rx="2" stroke="var(--text-faint)" strokeWidth="1.3" />
+      <path d="M2 2.5 15 13.5 28 2.5" stroke="var(--text-faint)" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="15" cy="14" r="2.4" fill="var(--text-faint)" opacity="0.5" />
+    </svg>
+  );
+}
+
 /** Inline privacy note shown at the point of input — a lock glyph plus one
  * line, styled as an eyebrow rather than a boxed callout so it doesn't add
  * visual weight to the ledger header. */
@@ -319,9 +332,13 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
         </div>
 
         {entries.length === 0 && (
-          <p className="mt-3 rounded-[var(--r-md)] border px-3 py-6 text-center text-sm" style={{ borderColor: "var(--line)", color: "var(--text-faint)" }}>
-            No recipients yet. Upload a CSV, paste rows, or add one manually.
-          </p>
+          <div
+            className="mt-3 flex flex-col items-center gap-2 rounded-[var(--r-md)] border px-3 py-6 text-center text-sm"
+            style={{ borderColor: "var(--line)", color: "var(--text-faint)" }}
+          >
+            <EmptyLedgerGlyph />
+            <p>No recipients yet. Upload a CSV, paste rows, or add one manually.</p>
+          </div>
         )}
 
         {/* mobile: card-per-row */}

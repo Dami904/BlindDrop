@@ -57,6 +57,19 @@ function campaignStatus(meta: CampaignMeta): Status {
   return "LIVE";
 }
 
+/** Sealed-envelope glyph for empty ledger/case-file states — reuses the
+ * envelope + wax-seal motif rather than an image, kept deliberately quiet
+ * (text-faint) since it marks an absence, not an action. */
+function EmptyLedgerGlyph() {
+  return (
+    <svg width="30" height="22" viewBox="0 0 30 22" fill="none" aria-hidden>
+      <rect x="1" y="1" width="28" height="20" rx="2" stroke="var(--text-faint)" strokeWidth="1.3" />
+      <path d="M2 2.5 15 13.5 28 2.5" stroke="var(--text-faint)" strokeWidth="1.3" strokeLinecap="round" />
+      <circle cx="15" cy="14" r="2.4" fill="var(--text-faint)" opacity="0.5" />
+    </svg>
+  );
+}
+
 function claimWindowLabel(meta: CampaignMeta, status: Status) {
   if (status === "UNKNOWN") return "Claim window unknown";
   if (status === "UPCOMING" && meta.startTime !== undefined) return `Opens ${formatCompactDate(meta.startTime)}`;
@@ -170,9 +183,12 @@ export function YourCampaigns() {
       >
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {list.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-              None saved yet — deploy a campaign and save it here to find it after a reload.
-            </p>
+            <div className="flex flex-col items-center gap-2 py-4 text-center sm:col-span-2">
+              <EmptyLedgerGlyph />
+              <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+                No case files yet — deploy a campaign and save it here.
+              </p>
+            </div>
           ) : (
             list.map((campaign, index) => (
               <CampaignCard

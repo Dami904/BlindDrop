@@ -21,6 +21,7 @@ import { TxStatusLine } from "@/components/TxStatus";
 import { describeDecryptError, formatConfidentialAmount } from "@/lib/confidential";
 import { describeMutationError, type FriendlyError } from "@/lib/errors";
 import { ErrorNote } from "@/components/ErrorNote";
+import { SealStamp } from "@/components/SealStamp";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -345,16 +346,19 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
             )}
 
             {claim.isSuccess && claim.data && (
-              <div className="callout callout-ok callout-col mt-4">
-                <span>
-                  Claim submitted.{" "}
-                  <a href={etherscanTxUrl(claim.data)} target="_blank" rel="noreferrer" className="font-data underline">
-                    View on Etherscan
+              <div className="mt-4">
+                <SealStamp>Claimed</SealStamp>
+                <div className="callout callout-ok callout-col mt-3">
+                  <span>
+                    Claim submitted.{" "}
+                    <a href={etherscanTxUrl(claim.data)} target="_blank" rel="noreferrer" className="font-data underline">
+                      View on Etherscan
+                    </a>
+                  </span>
+                  <a href="#verify" className="link-gold mt-2">
+                    Verify &amp; decrypt my allocation ↓
                   </a>
-                </span>
-                <a href="#verify" className="link-gold mt-2">
-                  Verify &amp; decrypt my allocation ↓
-                </a>
+                </div>
               </div>
             )}
           </div>

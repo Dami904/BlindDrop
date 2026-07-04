@@ -33,6 +33,7 @@ import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
 import { InfoTip } from "@/components/InfoTip";
 import { ErrorNote } from "@/components/ErrorNote";
 import { describeMutationError, type FriendlyError } from "@/lib/errors";
+import { SealStamp } from "@/components/SealStamp";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -77,7 +78,8 @@ function DisperseReceiptCard({ receipt }: { receipt: DisperseReceipt }) {
     <div className="envelope-card mt-4">
       <div className="envelope-flap" aria-hidden />
       <div className="relative z-10 p-5 pt-12">
-        <p className="eyebrow">Disperse receipt</p>
+        <SealStamp>Dispersed</SealStamp>
+        <p className="mt-2 eyebrow">Disperse receipt</p>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex items-center justify-between gap-4">
             <dt style={{ color: "var(--text-dim)" }}>Token</dt>

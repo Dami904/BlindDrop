@@ -503,6 +503,27 @@ body {
   background: radial-gradient(circle at 35% 30%, rgba(201, 162, 39, 0.25), var(--ink-2));
 }
 
+/* wax-seal stamp — success-moment mark (SealStamp.tsx), stamps in with a
+   quick scale-overshoot "thunk" like a physical seal landing on paper */
+.seal-stamp-mark {
+  animation: seal-stamp-in 500ms var(--ease-overshoot) both;
+}
+@keyframes seal-stamp-in {
+  0% {
+    transform: scale(0.35) rotate(-10deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .seal-stamp-mark {
+    animation: none;
+  }
+}
+
 /* redaction bar — literal metaphor for hidden data, doubles as a shimmer skeleton */
 .redaction {
   position: relative;

@@ -21,6 +21,7 @@ import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
 import { InfoTip } from "@/components/InfoTip";
 import { TokenSelect } from "@/components/TokenSelect";
 import { TokenAmountSummary } from "@/components/TokenAmountSummary";
+import { SealStamp } from "@/components/SealStamp";
 import type { RecipientRow } from "@/lib/csv";
 import { scaleAmountToUnits } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
@@ -257,7 +258,7 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
       ) : (
         <div className="flex flex-col gap-4">
           <div className="callout callout-gold callout-col">
-            <p>Campaign deployed.</p>
+            <SealStamp className="mb-1">Campaign deployed</SealStamp>
             <a
               href={etherscanAddressUrl(deployed.airdrop)}
               target="_blank"
