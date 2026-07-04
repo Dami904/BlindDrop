@@ -501,22 +501,28 @@ function FundingPanel({
         )}
 
         <div className="flex items-center gap-3">
-          <span className="seal-badge shrink-0" data-state={approved ? "active" : undefined} style={{ width: "1.5rem", height: "1.5rem" }}>
-            2
+          <span
+            className="seal-badge shrink-0"
+            data-state={fund.isSuccess ? "done" : approved ? "active" : undefined}
+            style={{ width: "1.5rem", height: "1.5rem" }}
+          >
+            {fund.isSuccess ? "✓" : "2"}
           </span>
           <div className="flex-1">
             <p className="text-sm" style={{ color: "var(--text)" }}>
-              Fund the campaign
+              {fund.isSuccess ? "Campaign funded" : "Fund the campaign"}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleFund}
-            disabled={!approved || fund.isPending || totalAmountUnits === BigInt(0)}
-            className="btn btn-gold shrink-0 text-xs"
-          >
-            {fund.isPending ? "Funding…" : "Fund campaign"}
-          </button>
+          {!fund.isSuccess && (
+            <button
+              type="button"
+              onClick={handleFund}
+              disabled={!approved || fund.isPending || totalAmountUnits === BigInt(0)}
+              className="btn btn-gold shrink-0 text-xs"
+            >
+              {fund.isPending ? "Funding…" : "Fund campaign"}
+            </button>
+          )}
         </div>
         {/* The fund mutation resolves with the tx hash only on success — no
             intermediate hash is observable, hence the combined message. */}
