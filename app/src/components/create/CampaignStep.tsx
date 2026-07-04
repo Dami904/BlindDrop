@@ -15,6 +15,7 @@ import {
 import { getConfidentialTestTokenAddress, getFheAirdropFactoryAddress } from "@tokenops/sdk";
 import type { Address, Hex } from "viem";
 import { etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
+import { loadCampaignNames, saveCampaignName } from "@/lib/create-storage";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
 import { InfoTip } from "@/components/InfoTip";
@@ -275,6 +276,8 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
             <TokenIdentityCard address={deployed.token} compact className="mt-2" />
           </div>
 
+          <NameCampaignPanel airdropAddress={deployed.airdrop} />
+
           <SaveToRegistry deployed={deployed} />
 
           {address && (
@@ -294,6 +297,53 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const CAMPAIGN_NAME_MAX_LENGTH = 40;
+
+/**
+ * Optional nickname prompt shown right after deploy — the natural moment to
+ * name a campaign, before an admin has to hunt for it in "Your campaigns"
+ * later. Saved only to this browser's localStorage (`create-storage.ts`);
+ * never sent anywhere or included in any on-chain call.
+ */
+function NameCampaignPanel({ airdropAddress }: { airdropAddress: Address }) {
+  const [name, setName] = useState(() => loadCampaignNames()[airdropAddress.toLowerCase()] ?? "");
+  const [saved, setSaved] = useState(false);
+
+  function handleSave() {
+    saveCampaignName(airdropAddress, name);
+    setName(name.trim().slice(0, CAMPAIGN_NAME_MAX_LENGTH));
+    setSaved(true);
+  }
+
+  return (
+    <div className="panel p-4">
+      <h3 className="eyebrow">Name this campaign</h3>
+      <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
+        Optional — a label to help you tell campaigns apart later, e.g. &quot;Investor Round&quot;.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={name}
+          maxLength={CAMPAIGN_NAME_MAX_LENGTH}
+          placeholder="e.g. Investor Round"
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaved(false);
+          }}
+          className="field text-sm"
+        />
+        <button type="button" onClick={handleSave} className="btn btn-gold text-xs">
+          {saved ? "Saved ✓" : "Save name"}
+        </button>
+      </div>
+      <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
+        Names are saved only in this browser — never on-chain.
+      </p>
     </div>
   );
 }

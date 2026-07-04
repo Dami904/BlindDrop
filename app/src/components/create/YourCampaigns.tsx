@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { isAddress, zeroAddress, type Address } from "viem";
 import { useMetadata } from "@zama-fhe/react-sdk";
@@ -7,6 +8,7 @@ import { confidentialAirdropCloneableAbi } from "@tokenops/sdk/fhe-airdrop";
 import { etherscanAddressUrl } from "@/lib/packet";
 import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
 import { Collapsible, ChevronIcon } from "@/components/Collapsible";
+import { loadCampaignNames, saveCampaignName } from "@/lib/create-storage";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -81,6 +83,27 @@ function claimWindowLabel(meta: CampaignMeta, status: Status) {
  */
 export function YourCampaigns() {
   const { address, isConnected } = useAccount();
+
+  // Local-only nicknames, keyed by lowercased campaign address — loaded once
+  // on mount and kept in state so renames re-render immediately without a
+  // re-read from localStorage on every card.
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setNames(loadCampaignNames());
+  }, []);
+
+  function handleRename(campaign: string, name: string) {
+    saveCampaignName(campaign, name);
+    setNames((prev) => {
+      const next = { ...prev };
+      const key = campaign.toLowerCase();
+      const trimmed = name.trim().slice(0, 40);
+      if (trimmed) next[key] = trimmed;
+      else delete next[key];
+      return next;
+    });
+  }
 
   const { data: campaigns, isLoading } = useReadContract({
     address: BLINDDROP_REGISTRY_ADDRESS,
@@ -157,10 +180,17 @@ export function YourCampaigns() {
                 campaign={campaign}
                 meta={metas[index]}
                 loading={metaLoading || !metas[index].settled}
+                name={names[campaign.toLowerCase()]}
+                onRename={(name) => handleRename(campaign, name)}
               />
             ))
           )}
         </div>
+        {list.length > 0 && (
+          <p className="mt-3 text-xs" style={{ color: "var(--text-faint)" }}>
+            Names are saved only in this browser — never on-chain.
+          </p>
+        )}
       </Collapsible>
     </div>
   );
@@ -170,10 +200,14 @@ function CampaignCard({
   campaign,
   meta,
   loading,
+  name,
+  onRename,
 }: {
   campaign: string;
   meta: CampaignMeta;
   loading: boolean;
+  name?: string;
+  onRename: (name: string) => void;
 }) {
   const status = campaignStatus(meta);
   const style = STATUS_STYLE[status];
@@ -195,15 +229,19 @@ function CampaignCard({
             {style.label}
           </span>
         )}
-        <a
-          href={etherscanAddressUrl(campaign)}
-          target="_blank"
-          rel="noreferrer"
-          className="link-gold font-data text-xs"
-        >
-          {shortAddress(campaign)}
-        </a>
+        {!name && (
+          <a
+            href={etherscanAddressUrl(campaign)}
+            target="_blank"
+            rel="noreferrer"
+            className="link-gold font-data text-xs"
+          >
+            {shortAddress(campaign)}
+          </a>
+        )}
       </div>
+
+      <CampaignNameField campaign={campaign} name={name} onRename={onRename} />
 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {loading ? (
@@ -244,6 +282,115 @@ function CampaignCard({
         </span>
       </div>
     </div>
+  );
+}
+
+const CAMPAIGN_NAME_MAX_LENGTH = 40;
+
+/**
+ * Local-only nickname for a campaign card: shows the name as the card's
+ * title (with the address demoted to a secondary line) when set, or just a
+ * small "name this" affordance when it isn't. Click the pencil (or the name
+ * itself) to edit inline; Enter/blur saves, Escape cancels. Never touches
+ * chain/server state — purely a `create-storage` localStorage round-trip via
+ * `onRename`.
+ */
+function CampaignNameField({
+  campaign,
+  name,
+  onRename,
+}: {
+  campaign: string;
+  name?: string;
+  onRename: (name: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function startEditing() {
+    setDraft(name ?? "");
+    setEditing(true);
+  }
+
+  function commit() {
+    setEditing(false);
+    onRename(draft);
+  }
+
+  function cancel() {
+    setDraft(name ?? "");
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        maxLength={CAMPAIGN_NAME_MAX_LENGTH}
+        placeholder="Name this campaign…"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancel();
+          }
+        }}
+        className="field text-sm"
+        aria-label="Campaign nickname"
+      />
+    );
+  }
+
+  if (name) {
+    return (
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
+            {name}
+          </p>
+          <a
+            href={etherscanAddressUrl(campaign)}
+            target="_blank"
+            rel="noreferrer"
+            className="link-gold font-data text-xs"
+          >
+            {shortAddress(campaign)}
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={startEditing}
+          className="shrink-0 text-xs"
+          style={{ color: "var(--text-faint)" }}
+          aria-label="Rename campaign"
+          title="Rename"
+        >
+          ✎
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEditing}
+      className="w-fit text-xs"
+      style={{ color: "var(--text-faint)" }}
+    >
+      ✎ Name this campaign
+    </button>
   );
 }
 

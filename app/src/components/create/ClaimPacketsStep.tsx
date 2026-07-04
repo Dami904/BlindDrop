@@ -10,7 +10,14 @@ import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
-import { clearPackets, loadEmailToggle, loadPackets, saveEmailToggle, savePackets } from "@/lib/create-storage";
+import {
+  clearPackets,
+  loadCampaignNames,
+  loadEmailToggle,
+  loadPackets,
+  saveEmailToggle,
+  savePackets,
+} from "@/lib/create-storage";
 import {
   buildReportCsv,
   buildReportJson,
@@ -151,8 +158,16 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [copiedAllLinks, setCopiedAllLinks] = useState(false);
 
+  // Local-only nickname (read-only here) — set from "Your campaigns" or the
+  // deploy-success panel, shown so this step is identifiable at a glance too.
+  const [campaignName, setCampaignName] = useState<string | undefined>(undefined);
+
   useEffect(() => {
     setEmailEnabled(loadEmailToggle(deployed.airdrop));
+  }, [deployed.airdrop]);
+
+  useEffect(() => {
+    setCampaignName(loadCampaignNames()[deployed.airdrop.toLowerCase()]);
   }, [deployed.airdrop]);
 
   function toggleEmailEnabled(next: boolean) {
@@ -470,6 +485,11 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             3
           </span>
           <h2 className="font-display text-lg">Claim packets</h2>
+          {campaignName && (
+            <span className="font-data text-xs" style={{ color: "var(--text-faint)" }}>
+              {campaignName}
+            </span>
+          )}
         </div>
         <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
           For each recipient, an encrypted allocation is sealed to their address, then

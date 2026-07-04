@@ -147,3 +147,54 @@ export function loadEmailToggle(airdropAddress: string): boolean {
     return false;
   }
 }
+
+export const CAMPAIGN_NAMES_KEY = "blinddrop:campaign-names:v1";
+
+const CAMPAIGN_NAME_MAX_LENGTH = 40;
+
+function isCampaignNamesRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value as Record<string, unknown>).every((v) => typeof v === "string");
+}
+
+/** Purely a local, browser-side label for an admin's own reference — never
+ * derived from or sent to chain/server. Names can be sensitive (e.g. "Investor
+ * Round"), so this is the only place they're ever persisted. */
+export function loadCampaignNames(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(CAMPAIGN_NAMES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return isCampaignNamesRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Saves a nickname for `airdropAddress`, keyed lowercased. An empty/blank
+ * name (after trimming) removes the entry rather than storing a blank string. */
+export function saveCampaignName(airdropAddress: string, name: string): void {
+  try {
+    const trimmed = name.trim().slice(0, CAMPAIGN_NAME_MAX_LENGTH);
+    const names = loadCampaignNames();
+    const key = airdropAddress.toLowerCase();
+    if (trimmed) {
+      names[key] = trimmed;
+    } else {
+      delete names[key];
+    }
+    localStorage.setItem(CAMPAIGN_NAMES_KEY, JSON.stringify(names));
+  } catch {
+    // storage unavailable/full — the campaign still works, just unnamed
+  }
+}
+
+export function deleteCampaignName(airdropAddress: string): void {
+  try {
+    const names = loadCampaignNames();
+    delete names[airdropAddress.toLowerCase()];
+    localStorage.setItem(CAMPAIGN_NAMES_KEY, JSON.stringify(names));
+  } catch {
+    // ignore
+  }
+}
