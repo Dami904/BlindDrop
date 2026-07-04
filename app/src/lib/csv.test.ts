@@ -175,15 +175,15 @@ describe("validateRecipientEntries", () => {
 
 describe("scaleAmountToUnits", () => {
   it("scales a decimal amount to 6-decimal raw units", () => {
-    expect(scaleAmountToUnits("1.5", 6)).toBe(1500000n);
-    expect(scaleAmountToUnits("1", 6)).toBe(1000000n);
-    expect(scaleAmountToUnits("0.000001", 6)).toBe(1n);
-    expect(scaleAmountToUnits("0", 6)).toBe(0n);
+    expect(scaleAmountToUnits("1.5", 6)).toBe(BigInt(1500000));
+    expect(scaleAmountToUnits("1", 6)).toBe(BigInt(1000000));
+    expect(scaleAmountToUnits("0.000001", 6)).toBe(BigInt(1));
+    expect(scaleAmountToUnits("0", 6)).toBe(BigInt(0));
   });
 
   it("pads fractional amounts shorter than the decimal precision", () => {
-    expect(scaleAmountToUnits("1.5000", 6)).toBe(1500000n);
-    expect(scaleAmountToUnits("2.1", 6)).toBe(2100000n);
+    expect(scaleAmountToUnits("1.5000", 6)).toBe(BigInt(1500000));
+    expect(scaleAmountToUnits("2.1", 6)).toBe(BigInt(2100000));
   });
 
   // Over-precise amounts must never be silently truncated — dropping digits

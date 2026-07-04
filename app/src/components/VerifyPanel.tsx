@@ -4,53 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { useConfidentialBalance } from "@zama-fhe/react-sdk";
-import {
-  BalanceCheckUnavailableError,
-  DecryptionFailedError,
-  NoCiphertextError,
-  RelayerRequestFailedError,
-  SigningRejectedError,
-  ZamaError,
-} from "@zama-fhe/sdk";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID } from "@/lib/packet";
+import { formatConfidentialAmount, describeDecryptError } from "@/lib/confidential";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
+import { TokenSelect } from "@/components/TokenSelect";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
 function isHexAddress(value: string): value is `0x${string}` {
   return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
-}
-
-function formatConfidentialAmount(raw: bigint): string {
-  const negative = raw < BigInt(0);
-  const abs = negative ? -raw : raw;
-  const divisor = BigInt(10) ** BigInt(CONFIDENTIAL_DECIMALS);
-  const whole = abs / divisor;
-  const frac = (abs % divisor).toString().padStart(CONFIDENTIAL_DECIMALS, "0").replace(/0+$/, "");
-  return `${negative ? "-" : ""}${whole.toString()}${frac ? `.${frac}` : ""}`;
-}
-
-function describeDecryptError(error: unknown): string {
-  if (error instanceof SigningRejectedError) {
-    return "You rejected the decryption signature request in your wallet. Approve the EIP-712 signature to decrypt your balance.";
-  }
-  if (error instanceof RelayerRequestFailedError) {
-    return "The Zama relayer couldn't be reached or returned an error. Please try again in a moment.";
-  }
-  if (error instanceof DecryptionFailedError) {
-    return "Decryption failed. Your wallet may not be authorized to view this balance.";
-  }
-  if (error instanceof NoCiphertextError) {
-    return "No encrypted balance found for this account on this token yet.";
-  }
-  if (error instanceof BalanceCheckUnavailableError) {
-    return "Couldn't read the encrypted balance handle from the token contract. Confirm the address is a valid ERC-7984 confidential token.";
-  }
-  if (error instanceof ZamaError) {
-    return error.message;
-  }
-  if (error instanceof Error) return error.message;
-  return "An unexpected error occurred while decrypting your balance.";
 }
 
 export interface VerifyPanelProps {
@@ -113,14 +75,9 @@ export function VerifyPanel({ initialToken, onVerified }: VerifyPanelProps) {
       )}
 
       <section className="mt-8 space-y-3">
-        <label className="label">ERC-7984 confidential token address</label>
-        <div className="flex gap-2">
-          <input
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            placeholder="0x…"
-            className="field font-data"
-          />
+        <label className="label">ERC-7984 confidential token</label>
+        <div className="flex items-start gap-2">
+          <TokenSelect value={tokenInput} onChange={setTokenInput} className="flex-1" />
           <button
             type="button"
             disabled={!tokenValid}
@@ -198,7 +155,7 @@ function ConfidentialBalanceSection({
               <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "color-mix(in srgb, var(--gold) 40%, transparent)", background: "var(--gold-dim)" }}>
                 <p className="eyebrow">Seal broken — decrypted balance</p>
                 <p className="font-display tabular mt-1 text-3xl" style={{ color: "var(--gold-bright)" }}>
-                  {formatConfidentialAmount(balance.data)}
+                  {formatConfidentialAmount(balance.data, CONFIDENTIAL_DECIMALS)}
                 </p>
                 <p className="font-data mt-1 text-xs" style={{ color: "var(--text-dim)" }}>
                   Raw units: {balance.data.toString()} ({CONFIDENTIAL_DECIMALS} decimals)

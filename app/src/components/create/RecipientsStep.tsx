@@ -4,9 +4,13 @@ import { useMemo, useRef, useState } from "react";
 import {
   newRecipientEntry,
   parseRecipientsCsv,
+  scaleAmountToUnits,
   validateRecipientEntries,
   type RecipientEntry,
 } from "@/lib/csv";
+import { formatConfidentialAmount } from "@/lib/confidential";
+
+const CONFIDENTIAL_DECIMALS = 6;
 
 interface RecipientsStepProps {
   entries: RecipientEntry[];
@@ -40,6 +44,10 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validated = useMemo(() => validateRecipientEntries(entries), [entries]);
+  const totalAmountUnits = useMemo(
+    () => validated.valid.reduce((sum, r) => sum + scaleAmountToUnits(r.amount, CONFIDENTIAL_DECIMALS), BigInt(0)),
+    [validated.valid]
+  );
 
   function appendRows(rows: { address: string; amount: string }[], errors: string[]) {
     if (rows.length > 0) {
@@ -315,6 +323,15 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
             {validated.valid.length}
           </span>{" "}
           valid recipient{validated.valid.length === 1 ? "" : "s"} ready
+          {validated.valid.length > 0 && (
+            <>
+              {" · Total to distribute: "}
+              <span className="font-data tabular" style={{ color: "var(--text)" }}>
+                {formatConfidentialAmount(totalAmountUnits, CONFIDENTIAL_DECIMALS)}
+              </span>
+              {" (token chosen next step)"}
+            </>
+          )}
         </p>
         <button type="button" onClick={onNext} disabled={!canProceed} className="btn btn-seal">
           Continue to campaign →

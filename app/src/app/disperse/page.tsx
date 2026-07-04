@@ -18,6 +18,8 @@ import {
 import { getConfidentialTestTokenAddress } from "@tokenops/sdk";
 import { DisperseRecipients } from "@/components/disperse/DisperseRecipients";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
+import { TokenAmountSummary } from "@/components/TokenAmountSummary";
+import { TokenSelect } from "@/components/TokenSelect";
 import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 import {
   newRecipientEntry,
@@ -119,6 +121,7 @@ export default function DispersePage() {
     () => validated.valid.map((r) => scaleAmountToUnits(r.amount, CONFIDENTIAL_DECIMALS)),
     [validated.valid]
   );
+  const totalAmountUnits = useMemo(() => amounts.reduce((sum, a) => sum + a, BigInt(0)), [amounts]);
 
   function invalidateDisperseQueries() {
     queryClient.invalidateQueries({ queryKey: ["tokenops-sdk", "fhe-disperse"] });
@@ -210,19 +213,22 @@ export default function DispersePage() {
         onOpenChange={(o) => setSectionOpen(1, o)}
       >
         <div className="space-y-3">
-          <label className="label">ERC-7984 confidential token address</label>
-          <input
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            placeholder="0x…"
-            className="field font-data"
-          />
+          <label className="label">ERC-7984 confidential token</label>
+          <TokenSelect value={tokenInput} onChange={setTokenInput} />
           {!tokenValid && tokenInput.length > 0 && (
             <p className="text-xs" style={{ color: "var(--err)" }}>
               Not a valid address.
             </p>
           )}
           {token && <TokenIdentityCard address={token} />}
+          {token && recipients.length > 0 && (
+            <TokenAmountSummary
+              token={token}
+              amountUnits={totalAmountUnits}
+              recipientCount={recipients.length}
+              className="text-sm"
+            />
+          )}
           <p className="text-xs" style={{ color: "var(--text-faint)" }}>
             Defaults to the CTTT test token from the faucet. Need test tokens?{" "}
             <Link href="/#faucet" className="link-gold">
@@ -316,6 +322,15 @@ export default function DispersePage() {
                   <li key={i}>{err.message}</li>
                 ))}
               </ul>
+            )}
+            {token && recipients.length > 0 && (
+              <TokenAmountSummary
+                token={token}
+                amountUnits={totalAmountUnits}
+                recipientCount={recipients.length}
+                className="mb-3 text-sm"
+                showRawUnits
+              />
             )}
             <button
               type="button"

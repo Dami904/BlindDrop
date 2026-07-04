@@ -82,20 +82,24 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
   const claim = useClaim({ address: (packet?.airdrop ?? "0x0000000000000000000000000000000000000000") as `0x${string}` });
 
   const loadFromText = useCallback((raw: string) => {
-    const result = parsePacketText(raw);
+    const result = parsePacketText(raw, address);
     if (!result.ok) {
       const message =
         result.error.kind === "empty-input"
           ? "Drop or paste a claim packet first."
           : result.error.kind === "invalid-json"
             ? `Couldn't parse that as JSON or base64 JSON: ${result.error.message}`
-            : "That doesn't look like a valid claim packet — check the shape against what your airdrop admin sent you.";
+            : result.error.kind === "multiple-packets-need-wallet"
+              ? `This file holds ${result.error.packetCount} claim packets. Connect your wallet and load it again — we'll pick out yours.`
+              : result.error.kind === "no-packet-for-wallet"
+                ? `This file holds ${result.error.packetCount} claim packets, but none belongs to the connected wallet. Switch to the wallet the airdrop was addressed to.`
+                : "That doesn't look like a valid claim packet — check it against what your airdrop admin sent you.";
       setLoadState({ kind: "error", message });
       return;
     }
     setLoadState({ kind: "loaded", packet: result.packet });
     onPacketLoaded?.();
-  }, [onPacketLoaded]);
+  }, [onPacketLoaded, address]);
 
   const onFileChange = useCallback(
     async (file: File | undefined) => {

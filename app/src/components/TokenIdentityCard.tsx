@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { Address } from "viem";
-import { useIsConfidential, useMetadata } from "@zama-fhe/react-sdk";
+import { useAccount } from "wagmi";
+import { useIsConfidential, useMetadata, useConfidentialBalance } from "@zama-fhe/react-sdk";
 import { etherscanAddressUrl } from "@/lib/packet";
+import { formatConfidentialAmount, describeDecryptError } from "@/lib/confidential";
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -17,8 +19,17 @@ export interface TokenIdentityCardProps {
   address: Address;
   className?: string;
   /** Renders a single-line summary instead of the full card — used at the moment of
-   * on-chain commitment (e.g. next to a "Deploy" confirmation) where space is tight. */
+   * on-chain commitment (e.g. next to a "Deploy" confirmation) where space is tight.
+   * The "Your balance" decrypt row is only shown in the full (non-compact) card. */
   compact?: boolean;
+  /**
+   * Optional raw-unit total the caller is about to move (e.g. a campaign's
+   * summed recipient amounts) — when the user decrypts their balance, a
+   * warning is shown if it's lower than this. Ignored in compact mode.
+   */
+  compareUnits?: bigint;
+  /** Label used in the "balance too low" warning, e.g. "campaign total". Defaults to "amount needed". */
+  compareLabel?: string;
 }
 
 /**
@@ -27,10 +38,18 @@ export interface TokenIdentityCardProps {
  * address. Read-only: fetches metadata via `useMetadata` and verifies the
  * ERC-7984 interface via `useIsConfidential`, both from `@zama-fhe/react-sdk`.
  */
-export function TokenIdentityCard({ address, className = "", compact = false }: TokenIdentityCardProps) {
+export function TokenIdentityCard({
+  address,
+  className = "",
+  compact = false,
+  compareUnits,
+  compareLabel = "amount needed",
+}: TokenIdentityCardProps) {
   const metadata = useMetadata(address);
   const isConfidential = useIsConfidential(address);
   const [copied, setCopied] = useState(false);
+  const { address: account, isConnected } = useAccount();
+  const [decryptRequested, setDecryptRequested] = useState(false);
 
   function copyAddress() {
     navigator.clipboard?.writeText(address);
@@ -128,6 +147,93 @@ export function TokenIdentityCard({ address, className = "", compact = false }: 
           )}
         </button>
       </div>
+
+      <div className="divider-stamped mt-1 flex items-center gap-2 pt-2">
+        <span className="text-xs" style={{ color: "var(--text-dim)" }}>
+          Your balance
+        </span>
+        {!isConnected && (
+          <span className="text-xs" style={{ color: "var(--text-faint)" }}>
+            Connect your wallet to see your balance.
+          </span>
+        )}
+        {isConnected && account && !decryptRequested && (
+          <>
+            <span className="redaction inline-block h-4 w-16 rounded" />
+            <button type="button" onClick={() => setDecryptRequested(true)} className="btn-quiet text-xs">
+              Decrypt
+            </button>
+          </>
+        )}
+        {isConnected && account && decryptRequested && (
+          <BalanceReveal
+            address={address}
+            account={account}
+            decimals={metadata.data?.decimals ?? 6}
+            compareUnits={compareUnits}
+            compareLabel={compareLabel}
+          />
+        )}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Mounted only once the user explicitly asks to decrypt (never
+ * auto-decrypted on token selection, since that would trigger an unwanted
+ * EIP-712 signature prompt) — `useConfidentialBalance` builds a token client
+ * from `address`/`account` unconditionally even while "disabled", so both
+ * must already be validated non-empty values by the time this mounts, which
+ * the parent guarantees (address comes from TokenIdentityCard's own
+ * validated prop; account is only passed once `useAccount()` reports connected).
+ */
+function BalanceReveal({
+  address,
+  account,
+  decimals,
+  compareUnits,
+  compareLabel,
+}: {
+  address: Address;
+  account: Address;
+  decimals: number;
+  compareUnits?: bigint;
+  compareLabel: string;
+}) {
+  const balance = useConfidentialBalance({ address, account }, { retry: false });
+
+  if (balance.isLoading) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="redaction inline-block h-4 w-16 rounded" />
+        <span className="text-xs" style={{ color: "var(--text-faint)" }}>
+          Awaiting signature…
+        </span>
+      </span>
+    );
+  }
+
+  if (!balance.isSuccess) {
+    return (
+      <span className="text-xs" style={{ color: "var(--err)" }}>
+        {describeDecryptError(balance.error)}
+      </span>
+    );
+  }
+
+  const low = typeof compareUnits === "bigint" && balance.data < compareUnits;
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="font-data tabular text-sm" style={{ color: "var(--gold-bright)" }}>
+        {formatConfidentialAmount(balance.data, decimals)}
+      </span>
+      {low && (
+        <span className="text-xs" style={{ color: "var(--warn)" }}>
+          Lower than the {compareLabel} — you may not have enough to fund it.
+        </span>
+      )}
+    </span>
   );
 }

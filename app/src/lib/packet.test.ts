@@ -86,6 +86,53 @@ describe("isClaimPacket", () => {
   });
 });
 
+describe("parsePacketText — multi-packet (download-all) inputs", () => {
+  const otherRecipient = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
+  const otherPacket: ClaimPacket = { ...validPacket(), recipient: otherRecipient };
+
+  it("selects the connected wallet's packet from a bare array", () => {
+    const raw = JSON.stringify([otherPacket, validPacket()]);
+    const result = parsePacketText(raw, RECIPIENT.toLowerCase());
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.packet.recipient).toBe(RECIPIENT);
+  });
+
+  it("accepts a single-element array without a wallet", () => {
+    const result = parsePacketText(JSON.stringify([validPacket()]));
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts { address, packet } wrapper entries", () => {
+    const raw = JSON.stringify([
+      { address: otherRecipient, packet: otherPacket },
+      { address: RECIPIENT, packet: validPacket() },
+    ]);
+    const result = parsePacketText(raw, RECIPIENT);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.packet.recipient).toBe(RECIPIENT);
+  });
+
+  it("asks for a wallet when multiple packets and none provided", () => {
+    const result = parsePacketText(JSON.stringify([otherPacket, validPacket()]));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe("multiple-packets-need-wallet");
+    }
+  });
+
+  it("reports when no packet matches the connected wallet", () => {
+    const stranger = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
+    const result = parsePacketText(JSON.stringify([otherPacket, validPacket()]), stranger);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.kind).toBe("no-packet-for-wallet");
+      if (result.error.kind === "no-packet-for-wallet") {
+        expect(result.error.packetCount).toBe(2);
+      }
+    }
+  });
+});
+
 describe("parsePacketText", () => {
   it("parses a valid raw JSON packet", () => {
     const raw = JSON.stringify(validPacket());

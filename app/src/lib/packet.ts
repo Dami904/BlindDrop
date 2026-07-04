@@ -56,17 +56,21 @@ export function isClaimPacket(value: unknown): value is ClaimPacket {
 export type PacketParseError =
   | { kind: "empty-input" }
   | { kind: "invalid-json"; message: string }
-  | { kind: "invalid-shape" };
+  | { kind: "invalid-shape" }
+  | { kind: "no-packet-for-wallet"; packetCount: number }
+  | { kind: "multiple-packets-need-wallet"; packetCount: number };
 
 export type PacketParseResult =
   | { ok: true; packet: ClaimPacket }
   | { ok: false; error: PacketParseError };
 
 /**
- * Parse raw text (either a raw JSON object, or a base64-encoded JSON blob)
- * into a validated {@link ClaimPacket}. Pure function — no I/O.
+ * Parse raw text (a raw JSON packet, a base64-encoded JSON blob, or a
+ * "download all" JSON array of packets) into a validated {@link ClaimPacket}.
+ * When the input holds multiple packets, `walletAddress` selects the one
+ * belonging to the connected wallet. Pure function — no I/O.
  */
-export function parsePacketText(raw: string): PacketParseResult {
+export function parsePacketText(raw: string, walletAddress?: string): PacketParseResult {
   const trimmed = raw.trim();
   if (!trimmed) {
     return { ok: false, error: { kind: "empty-input" } };
@@ -93,11 +97,37 @@ export function parsePacketText(raw: string): PacketParseResult {
   }
 
   let lastJsonError: string | undefined;
+  let arrayError: PacketParseError | undefined;
   for (const candidate of candidates) {
     try {
       const parsed: unknown = JSON.parse(candidate);
       if (isClaimPacket(parsed)) {
         return { ok: true, packet: parsed };
+      }
+      // A "download all" export is an array of packets. Pick the connected
+      // wallet's packet; a single-element array needs no wallet to disambiguate.
+      if (Array.isArray(parsed)) {
+        const packets = parsed
+          .map((entry) =>
+            isClaimPacket(entry)
+              ? entry
+              : // "download all" wraps each packet as { address, packet }
+                entry && typeof entry === "object" && isClaimPacket((entry as { packet?: unknown }).packet)
+                ? ((entry as { packet: ClaimPacket }).packet)
+                : undefined
+          )
+          .filter((p): p is ClaimPacket => p !== undefined);
+        if (packets.length > 0) {
+          if (packets.length === 1) return { ok: true, packet: packets[0] };
+          if (walletAddress) {
+            const mine = packets.find((p) => isSameAddress(p.recipient, walletAddress));
+            if (mine) return { ok: true, packet: mine };
+            arrayError = { kind: "no-packet-for-wallet", packetCount: packets.length };
+          } else {
+            arrayError = { kind: "multiple-packets-need-wallet", packetCount: packets.length };
+          }
+          continue;
+        }
       }
       // Parsed fine but shape doesn't match — keep trying other candidates,
       // but remember that at least one candidate parsed as JSON.
@@ -107,6 +137,9 @@ export function parsePacketText(raw: string): PacketParseResult {
     }
   }
 
+  if (arrayError) {
+    return { ok: false, error: arrayError };
+  }
   if (lastJsonError) {
     return { ok: false, error: { kind: "invalid-json", message: lastJsonError } };
   }

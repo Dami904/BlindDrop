@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useZamaSDK } from "@zama-fhe/react-sdk";
 import { encryptUint64, useSignClaimAuthorization } from "@tokenops/sdk/fhe-airdrop/react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 import { SEPOLIA_CHAIN_ID, type ClaimPacket } from "@/lib/packet";
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
@@ -17,6 +17,43 @@ interface ClaimPacketsStepProps {
 interface GeneratedPacket {
   address: Address;
   packet: ClaimPacket;
+}
+
+interface EncryptFailure {
+  recipient: RecipientRow;
+  message: string;
+}
+
+/** How many concurrent relayer encryption requests to run at once — bounded so
+ * a large recipient list doesn't fire hundreds of simultaneous requests. */
+const ENCRYPT_CONCURRENCY = 5;
+
+/**
+ * Tiny inline promise pool: runs `worker` over `items` with at most
+ * `concurrency` in flight at a time. Per-item failures are reported via
+ * `onSettle` rather than rejecting the whole pool, so one bad recipient
+ * doesn't abort encryption for the rest of the batch.
+ */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+  onSettle: (item: T, result: { ok: true; value: R } | { ok: false; error: unknown }) => void
+): Promise<void> {
+  let cursor = 0;
+  async function runNext(): Promise<void> {
+    while (cursor < items.length) {
+      const item = items[cursor++];
+      try {
+        const value = await worker(item);
+        onSettle(item, { ok: true, value });
+      } catch (error) {
+        onSettle(item, { ok: false, error });
+      }
+    }
+  }
+  const poolSize = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: poolSize }, runNext));
 }
 
 function toBase64(json: string): string {
@@ -45,36 +82,93 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const sign = useSignClaimAuthorization();
 
   const [packets, setPackets] = useState<GeneratedPacket[]>([]);
-  const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<"encrypting" | "signing" | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
 
-  const total = recipients.length;
-  const done = progress;
-  const current = recipients[progress];
+  // Stage 1 (encryption) is parallelized, so its progress is just a settled
+  // count — there's no single "current recipient" while several requests
+  // are in flight at once.
+  const [encryptTotal, setEncryptTotal] = useState(0);
+  const [encryptSettled, setEncryptSettled] = useState(0);
+  const [encryptFailures, setEncryptFailures] = useState<EncryptFailure[]>([]);
 
-  async function generateAll() {
+  // Stage 2 (signing) is sequential — only one wallet popup can show at a
+  // time — so it does track a "current recipient" like before.
+  const [signTotal, setSignTotal] = useState(0);
+  const [signProgress, setSignProgress] = useState(0);
+  const [signingCurrent, setSigningCurrent] = useState<RecipientRow | null>(null);
+
+  const total = recipients.length;
+  const packetsByAddress = new Map(packets.map((p) => [p.address.toLowerCase(), p]));
+  const remaining = recipients.filter((r) => !packetsByAddress.has(r.address.toLowerCase()));
+
+  /**
+   * Runs the two-stage pipeline over `targets` (defaults to every recipient
+   * without a packet yet — i.e. a fresh run, or only the previously-failed
+   * ones when called from "Retry failed"). Encryption results are collected
+   * first (in parallel, bounded concurrency); only recipients that encrypted
+   * successfully move on to sequential signing. Already-generated packets
+   * from a prior run are kept, not discarded.
+   */
+  async function generate(targets: RecipientRow[]) {
+    if (targets.length === 0) return;
     setError(null);
     setIsRunning(true);
-    setPackets([]);
-    setProgress(0);
+    setEncryptFailures([]);
+    setEncryptTotal(targets.length);
+    setEncryptSettled(0);
+    setSignTotal(0);
+    setSignProgress(0);
+    setSigningCurrent(null);
 
-    const results: GeneratedPacket[] = [];
     try {
-      for (const recipient of recipients) {
-        const amountUnits = scaleAmountToUnits(recipient.amount, 6);
+      // --- Stage 1: encrypt allocations in parallel (bounded concurrency) ---
+      setStage("encrypting");
+      const encrypted = new Map<string, { handle: Hex; inputProof: Hex }>();
+      const failures: EncryptFailure[] = [];
 
-        setStage("encrypting");
-        const encryptedInput = await encryptUint64({
-          encryptor: toTokenOpsEncryptor(zamaSDK.relayer),
-          contractAddress: deployed.airdrop,
-          userAddress: recipient.address,
-          value: amountUnits,
-        });
+      await runWithConcurrency(
+        targets,
+        ENCRYPT_CONCURRENCY,
+        async (recipient) => {
+          const amountUnits = scaleAmountToUnits(recipient.amount, 6);
+          return encryptUint64({
+            encryptor: toTokenOpsEncryptor(zamaSDK.relayer),
+            contractAddress: deployed.airdrop,
+            userAddress: recipient.address,
+            value: amountUnits,
+          });
+        },
+        (recipient, result) => {
+          if (result.ok) {
+            encrypted.set(recipient.address.toLowerCase(), {
+              handle: result.value.handle,
+              inputProof: result.value.inputProof,
+            });
+          } else {
+            failures.push({
+              recipient,
+              message: result.error instanceof Error ? result.error.message : String(result.error),
+            });
+          }
+          setEncryptSettled((n) => n + 1);
+        }
+      );
 
-        setStage("signing");
+      setEncryptFailures(failures);
+
+      // --- Stage 2: sign authorizations one at a time (wallet-gated) ---
+      const toSign = targets.filter((r) => encrypted.has(r.address.toLowerCase()));
+      setStage("signing");
+      setSignTotal(toSign.length);
+
+      const newPackets: GeneratedPacket[] = [];
+      for (const recipient of toSign) {
+        setSigningCurrent(recipient);
+        const encryptedInput = encrypted.get(recipient.address.toLowerCase())!;
+
         const signature = await sign.mutateAsync({
           airdropAddress: deployed.airdrop,
           recipient: recipient.address,
@@ -94,16 +188,30 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           signature,
         };
 
-        results.push({ address: recipient.address, packet });
-        setPackets([...results]);
-        setProgress(results.length);
+        newPackets.push({ address: recipient.address, packet });
+        setSignProgress((n) => n + 1);
+        setPackets((prev) => {
+          const byAddress = new Map(prev.map((p) => [p.address.toLowerCase(), p]));
+          byAddress.set(recipient.address.toLowerCase(), { address: recipient.address, packet });
+          return Array.from(byAddress.values());
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsRunning(false);
       setStage(null);
+      setSigningCurrent(null);
     }
+  }
+
+  function generateAll() {
+    setPackets([]);
+    void generate(recipients);
+  }
+
+  function retryFailed() {
+    void generate(encryptFailures.map((f) => f.recipient));
   }
 
   function copyBase64(gp: GeneratedPacket) {
@@ -117,6 +225,8 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
     downloadJson(`claim-packets-${deployed.airdrop}.json`, packets.map((p) => p.packet));
   }
 
+  const encryptDone = stage === null || stage === "signing";
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -128,8 +238,10 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
         </div>
         <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
           For each recipient, an encrypted allocation is sealed to their address, then
-          admin-signed. This runs sequentially and can take a while — each step is a real FHE
-          encryption + relayer round-trip. Nothing is sent to a server; packets stay in your browser.
+          admin-signed. Encryption runs in parallel (a few relayer round-trips at once); signing
+          happens one at a time — each authorization is individually signed by your wallet, so
+          approve each prompt as it appears. Nothing is sent to a server; packets stay in your
+          browser.
         </p>
       </div>
 
@@ -150,21 +262,25 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             <div
               className="h-full transition-all"
               style={{
-                width: `${total === 0 ? 0 : (done / total) * 100}%`,
+                width: `${total === 0 ? 0 : (packets.length / total) * 100}%`,
                 background: "linear-gradient(90deg, var(--seal), var(--gold))",
                 transitionDuration: "var(--dur-med)",
               }}
             />
           </div>
           <p className="font-data mt-2 text-xs" style={{ color: "var(--text-dim)" }}>
-            {isRunning && current ? (
+            {isRunning && stage === "encrypting" && (
+              <>Encrypting allocations… {encryptSettled}/{encryptTotal}</>
+            )}
+            {isRunning && stage === "signing" && signingCurrent && (
               <>
-                {stage === "signing" ? "Signing" : "Encrypting"} allocation {done + 1} of {total} —{" "}
-                {shortAddress(current.address)}…
+                Signing authorization {signProgress + 1} of {signTotal} —{" "}
+                {shortAddress(signingCurrent.address)}…
               </>
-            ) : (
+            )}
+            {!isRunning && (
               <>
-                {done} / {total} sealed{isRunning ? "…" : ""}
+                {packets.length} / {total} sealed
               </>
             )}
           </p>
@@ -173,6 +289,25 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
 
       {error && <p className="text-sm" style={{ color: "var(--err)" }}>{error}</p>}
 
+      {!isRunning && encryptDone && encryptFailures.length > 0 && (
+        <div className="callout callout-warn callout-col">
+          <p>
+            {encryptFailures.length} recipient{encryptFailures.length === 1 ? "" : "s"} failed to encrypt and{" "}
+            {encryptFailures.length === 1 ? "wasn't" : "weren't"} signed:
+          </p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs">
+            {encryptFailures.map((f) => (
+              <li key={f.recipient.address}>
+                {shortAddress(f.recipient.address)}: {f.message}
+              </li>
+            ))}
+          </ul>
+          <button type="button" onClick={retryFailed} className="btn btn-gold mt-3 w-fit text-xs">
+            Retry failed encryption{encryptFailures.length === 1 ? "" : "s"}
+          </button>
+        </div>
+      )}
+
       {packets.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -180,9 +315,9 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
               {packets.length} packet{packets.length === 1 ? "" : "s"} ready
             </p>
             <div className="flex gap-2">
-              {!isRunning && packets.length < total && (
-                <button type="button" onClick={generateAll} className="btn btn-ghost text-xs">
-                  Retry / regenerate
+              {!isRunning && remaining.length > 0 && encryptFailures.length === 0 && (
+                <button type="button" onClick={() => void generate(remaining)} className="btn btn-ghost text-xs">
+                  Generate remaining
                 </button>
               )}
               <button type="button" onClick={downloadAll} className="btn btn-gold text-xs">

@@ -15,6 +15,8 @@ import { getConfidentialTestTokenAddress, getFheAirdropFactoryAddress } from "@t
 import type { Address, Hex } from "viem";
 import { etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
+import { TokenSelect } from "@/components/TokenSelect";
+import { TokenAmountSummary } from "@/components/TokenAmountSummary";
 import type { RecipientRow } from "@/lib/csv";
 import { scaleAmountToUnits } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
@@ -73,7 +75,16 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
 
   const wrongChain = isConnected && chainId !== sepolia.id;
   const tokenValid = /^0x[0-9a-fA-F]{40}$/.test(tokenAddress);
-  const windowValid = startTimestamp > now - 60 && endTimestamp > startTimestamp;
+
+  // Claim-window validation: checked independently so the error message can
+  // point at exactly what's wrong, rather than a single generic message that
+  // doesn't distinguish "end before start" from "window already elapsed".
+  const windowEndsBeforeStart = endTimestamp <= startTimestamp;
+  const windowAlreadyOver = !windowEndsBeforeStart && endTimestamp <= now;
+  const windowValid = !windowEndsBeforeStart && !windowAlreadyOver;
+  // Soft warning only — a start time slightly in the past is fine (e.g. clock
+  // skew or a deliberate immediate-start campaign), so this never blocks Deploy.
+  const startInPast = startTimestamp < now - 5 * 60;
 
   async function handleDeploy() {
     setDeployError(null);
@@ -145,22 +156,25 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
 
       <div className="grid gap-4">
         <label className="block">
-          <span className="label">Confidential token address (ERC-7984)</span>
-          <input
-            value={tokenAddress}
-            onChange={(e) => setTokenAddress(e.target.value)}
-            disabled={!!deployed}
-            placeholder="0x..."
-            className="field font-data mt-1 disabled:opacity-60"
-          />
+          <span className="label">Confidential token (ERC-7984)</span>
+          <div className="mt-1">
+            <TokenSelect value={tokenAddress} onChange={setTokenAddress} disabled={!!deployed} />
+          </div>
           {!tokenAddress && (
             <span className="mt-1 block text-xs" style={{ color: "var(--text-faint)" }}>
               Defaults to the CTTT testnet token if available.
             </span>
           )}
-          {tokenValid && (
+          {/* Once deployed, the token is locked on-chain — shown only as the
+              compact line in the "Airdrop deployed" confirmation below, so it
+              isn't rendered twice. */}
+          {tokenValid && !deployed && (
             <div className="mt-3">
-              <TokenIdentityCard address={tokenAddress as Address} />
+              <TokenIdentityCard
+                address={tokenAddress as Address}
+                compareUnits={totalAmountUnits}
+                compareLabel="campaign total"
+              />
             </div>
           )}
         </label>
@@ -187,7 +201,21 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
             />
           </label>
         </div>
-        {!windowValid && <p className="text-xs" style={{ color: "var(--err)" }}>Claim window end must be after start.</p>}
+        {windowEndsBeforeStart && (
+          <p className="text-xs" style={{ color: "var(--err)" }}>
+            Claim window ends before it starts.
+          </p>
+        )}
+        {windowAlreadyOver && (
+          <p className="text-xs" style={{ color: "var(--err)" }}>
+            Claim window is already over.
+          </p>
+        )}
+        {windowValid && startInPast && (
+          <p className="text-xs" style={{ color: "var(--warn)" }}>
+            Claim window start is in the past — the campaign will be immediately claimable.
+          </p>
+        )}
         <p className="text-xs" style={{ color: "var(--text-faint)" }}>
           The claim window can&apos;t be extended once the campaign is deployed.
         </p>
@@ -195,6 +223,14 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
 
       {!deployed ? (
         <div>
+          {tokenValid && recipients.length > 0 && (
+            <TokenAmountSummary
+              token={tokenAddress as Address}
+              amountUnits={totalAmountUnits}
+              recipientCount={recipients.length}
+              className="mb-3 text-sm"
+            />
+          )}
           <button
             type="button"
             onClick={handleDeploy}
@@ -331,11 +367,16 @@ function FundingPanel({
     <div className="panel p-4">
       <h3 className="eyebrow">Fund the campaign</h3>
       <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
-        Funding moves the encrypted total ({recipients.length} recipient{recipients.length === 1 ? "" : "s"},{" "}
-        <span className="font-data tabular">{totalAmountUnits.toString()}</span> raw units) from your wallet into
-        the campaign so recipients can claim. First allow the campaign factory to move your tokens (a one-time
-        approval), then fund.
+        Funding moves the encrypted total from your wallet into the campaign so recipients can claim. First
+        allow the campaign factory to move your tokens (a one-time approval), then fund.
       </p>
+      <TokenAmountSummary
+        token={deployed.token}
+        amountUnits={totalAmountUnits}
+        recipientCount={recipients.length}
+        className="mt-2 text-sm"
+        showRawUnits
+      />
 
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex items-center gap-3">
