@@ -444,7 +444,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
         )}
       </div>
 
-      <div className="divider-stamped flex items-center justify-between pt-4">
+      <div className="divider-stamped flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-4">
         <p className="text-sm" style={{ color: "var(--text-dim)" }}>
           <span className="tabular font-medium" style={{ color: "var(--text)" }}>
             {validated.valid.length}
