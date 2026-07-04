@@ -10,8 +10,8 @@ import {
   NoCiphertextError,
   RelayerRequestFailedError,
   SigningRejectedError,
-  ZamaError,
 } from "@zama-fhe/sdk";
+import { describeMutationError, type FriendlyError } from "@/lib/errors";
 
 /** Formats a raw confidential balance (bigint) using the token's decimals. */
 export function formatConfidentialAmount(raw: bigint, decimals: number): string {
@@ -23,26 +23,22 @@ export function formatConfidentialAmount(raw: bigint, decimals: number): string 
   return `${negative ? "-" : ""}${whole.toString()}${frac ? `.${frac}` : ""}`;
 }
 
-/** Maps a decrypt-balance mutation/query error to a plain-language message. */
-export function describeDecryptError(error: unknown): string {
+/** Maps a decrypt-balance mutation/query error to friendly copy + a raw detail. */
+export function describeDecryptError(error: unknown): FriendlyError {
   if (error instanceof SigningRejectedError) {
-    return "You rejected the decryption signature request in your wallet. Approve the EIP-712 signature to decrypt your balance.";
+    return { message: "No problem — approve the signature request in your wallet when you're ready to decrypt." };
   }
   if (error instanceof RelayerRequestFailedError) {
-    return "The Zama relayer couldn't be reached or returned an error. Please try again in a moment.";
+    return { message: "Couldn't reach the decryption service — try again in a moment.", detail: error.message };
   }
   if (error instanceof DecryptionFailedError) {
-    return "Decryption failed. Your wallet may not be authorized to view this balance.";
+    return { message: "This balance couldn't be decrypted — your wallet may not be authorized to view it.", detail: error.message };
   }
   if (error instanceof NoCiphertextError) {
-    return "No encrypted balance found for this account on this token yet.";
+    return { message: "No balance found yet for this account on this token." };
   }
   if (error instanceof BalanceCheckUnavailableError) {
-    return "Couldn't read the encrypted balance handle from the token contract. Confirm the address is a valid ERC-7984 confidential token.";
+    return { message: "Couldn't read this token's balance — double-check it's a valid ERC-7984 confidential token.", detail: error.message };
   }
-  if (error instanceof ZamaError) {
-    return error.message;
-  }
-  if (error instanceof Error) return error.message;
-  return "An unexpected error occurred while decrypting your balance.";
+  return describeMutationError(error, "Something went wrong decrypting your balance — you can try again.");
 }

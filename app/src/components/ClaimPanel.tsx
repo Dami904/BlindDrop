@@ -19,49 +19,53 @@ import {
 } from "@/lib/packet";
 import { TxStatusLine } from "@/components/TxStatus";
 import { describeDecryptError, formatConfidentialAmount } from "@/lib/confidential";
+import { describeMutationError, type FriendlyError } from "@/lib/errors";
+import { ErrorNote } from "@/components/ErrorNote";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
 type LoadState =
   | { kind: "idle" }
-  | { kind: "error"; message: string }
+  | { kind: "error"; message: string; detail?: string }
   | { kind: "loaded"; packet: ClaimPacket };
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-/** Turn a raw error (SDK typed error or generic) into a readable message. */
-function describeClaimError(error: unknown): string {
+/** Turn a raw error (SDK typed error or generic) into friendly, actionable copy. */
+function describeClaimError(error: unknown): FriendlyError {
   if (isTokenOpsSdkError(error)) {
     switch (error.code) {
       case "TOKENOPS_ALREADY_CLAIMED":
-        return "This allocation has already been claimed.";
+        return { message: "This allocation has already been claimed — there's nothing left to do here." };
       case "TOKENOPS_CLAIM_NOT_STARTED":
-        return "The claim window hasn't opened yet.";
+        return { message: "The claim window hasn't opened yet — check back once it starts." };
       case "TOKENOPS_CLAIM_WINDOW_CLOSED":
-        return "The claim window has closed.";
+        return { message: "The claim window has closed. Contact the campaign admin if you think this is a mistake." };
       case "TOKENOPS_PAUSED":
-        return "Claims are currently paused by the airdrop admin.";
+        return { message: "Claims are paused by the campaign admin right now — try again later." };
       case "TOKENOPS_INVALID_SIGNATURE":
-        return "The claim signature is invalid or malformed. Double-check your claim packet.";
+        return { message: "This claim packet's signature doesn't check out — ask the sender for a fresh packet." };
       case "TOKENOPS_INSUFFICIENT_FEE":
-        return "The transaction didn't attach enough ETH to cover the gas fee.";
+        return { message: "Your wallet needs a little Sepolia ETH for gas — grab some from a faucet and retry." };
       case "TOKENOPS_WALLET_REJECTED":
       case "TOKENOPS_USER_REJECTED":
-        return "You rejected the transaction in your wallet.";
+        return { message: "No problem — the transaction was cancelled." };
       case "TOKENOPS_WALLET_CHAIN_MISMATCH":
-        return "Your wallet is on the wrong network. Switch to Sepolia and try again.";
+        return { message: "Your wallet is on the wrong network — switch to Sepolia and try again." };
       case "TOKENOPS_NETWORK_ERROR":
-        return "Network error talking to the RPC endpoint. Please try again.";
+        return { message: "Couldn't reach the network — check your connection and try again." };
       case "TOKENOPS_CONTRACT_REVERT":
-        return "The transaction reverted on-chain. This allocation may already be claimed or the window may be closed.";
+        return {
+          message: "The transaction was rejected on-chain — this allocation may already be claimed, or the window may be closed.",
+          detail: error.message,
+        };
       default:
-        return error.message;
+        return describeMutationError(error, "Something went wrong submitting the claim — you can try again.");
     }
   }
-  if (error instanceof Error) return error.message;
-  return "An unexpected error occurred while submitting the claim.";
+  return describeMutationError(error, "Something went wrong submitting the claim — you can try again.");
 }
 
 export interface ClaimPanelProps {
@@ -95,13 +99,14 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
         result.error.kind === "empty-input"
           ? "Drop or paste a claim packet first."
           : result.error.kind === "invalid-json"
-            ? `Couldn't parse that as JSON or base64 JSON: ${result.error.message}`
+            ? "That file doesn't look like a claim packet — check it's the one your campaign admin sent you."
             : result.error.kind === "multiple-packets-need-wallet"
               ? `This file holds ${result.error.packetCount} claim packets. Connect your wallet and load it again — we'll pick out yours.`
               : result.error.kind === "no-packet-for-wallet"
-                ? `This file holds ${result.error.packetCount} claim packets, but none belongs to the connected wallet. Switch to the wallet the airdrop was addressed to.`
-                : "That doesn't look like a valid claim packet — check it against what your airdrop admin sent you.";
-      setLoadState({ kind: "error", message });
+                ? `This file holds ${result.error.packetCount} claim packets, but none belongs to the connected wallet. Switch to the wallet this claim was addressed to.`
+                : "That doesn't look like a valid claim packet — check it against what your campaign admin sent you.";
+      const detail = result.error.kind === "invalid-json" ? result.error.message : undefined;
+      setLoadState({ kind: "error", message, detail });
       return;
     }
     setLoadState({ kind: "loaded", packet: result.packet });
@@ -236,7 +241,7 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
           </button>
         </div>
 
-        {loadState.kind === "error" && <div className="callout callout-err">{loadState.message}</div>}
+        {loadState.kind === "error" && <ErrorNote message={loadState.message} detail={loadState.detail} />}
       </section>
 
       {packet && (
@@ -246,7 +251,7 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
             <h2 className="font-display text-lg">Claim summary</h2>
             <dl className="mt-4 space-y-3 text-sm">
               <div className="flex items-center justify-between gap-4">
-                <dt style={{ color: "var(--text-dim)" }}>Airdrop contract</dt>
+                <dt style={{ color: "var(--text-dim)" }}>Campaign contract</dt>
                 <dd>
                   <a
                     href={etherscanAddressUrl(packet.airdrop)}
@@ -331,7 +336,13 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
               <TxStatusLine awaitingWallet={claim.isPending} className="mt-2 justify-center" />
             </div>
 
-            {claim.isError && <div className="callout callout-err mt-4">{describeClaimError(claim.error)}</div>}
+            {claim.isError && (
+              <ErrorNote
+                className="mt-4"
+                message={describeClaimError(claim.error).message}
+                detail={describeClaimError(claim.error).detail}
+              />
+            )}
 
             {claim.isSuccess && claim.data && (
               <div className="callout callout-ok callout-col mt-4">
@@ -442,10 +453,16 @@ function AllocationReveal({ packet, canReveal }: { packet: ClaimPacket; canRevea
       )}
 
       {getClaimAmount.isError && (
-        <div className="callout callout-err">{describeClaimError(getClaimAmount.error)}</div>
+        <ErrorNote
+          message={describeClaimError(getClaimAmount.error).message}
+          detail={describeClaimError(getClaimAmount.error).detail}
+        />
       )}
       {handle && decrypt.isError && (
-        <div className="callout callout-err">{describeDecryptError(decrypt.error)}</div>
+        <ErrorNote
+          message={describeDecryptError(decrypt.error).message}
+          detail={describeDecryptError(decrypt.error).detail}
+        />
       )}
 
       <p className="text-xs" style={{ color: "var(--text-faint)" }}>

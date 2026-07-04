@@ -277,11 +277,11 @@ export function AutoSendPanel({ recipients, auto }: AutoSendPanelProps) {
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={auto.saveConfig} className="btn btn-ghost w-fit text-xs">
-          Save config
+          Save settings
         </button>
         {auto.config && (
           <span className="text-xs" style={{ color: auto.configComplete ? "var(--callout-ok-text)" : "var(--text-faint)" }}>
-            {auto.configComplete ? "Config saved" : "Config saved, but incomplete"}
+            {auto.configComplete ? "Settings saved" : "Settings saved, but incomplete"}
           </span>
         )}
       </div>
@@ -314,8 +314,7 @@ export function AutoSendPanel({ recipients, auto }: AutoSendPanelProps) {
           {auto.envConfigured ? (
             <>
               <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-                Emails are sent from your browser via the app&apos;s mail service (EmailJS) — quota
-                is shared; no BlindDrop server involved.
+                Emails send from your browser via the app&apos;s shared EmailJS quota.
               </p>
               <div className="rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)" }}>
                 <Collapsible
@@ -377,9 +376,8 @@ export function AutoSendPanel({ recipients, auto }: AutoSendPanelProps) {
 
           {!auto.envConfigured && (
             <p className="text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
-              Emails are sent from your browser through your EmailJS account — BlindDrop has no
-              server and never sees your list; EmailJS (your chosen provider) processes the
-              recipient emails and links, like any mail provider would.
+              Emails send straight from your browser through your own EmailJS account — BlindDrop
+              never sees the recipient list.
             </p>
           )}
         </div>

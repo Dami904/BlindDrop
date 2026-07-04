@@ -42,7 +42,7 @@ export const GUIDE_SCRIPTS: Record<string, GuideStep> = {
     step: 2,
     label: "Create",
     messages: [
-      { text: "Step two, and three are folded into one dossier: build the recipient list, deploy the airdrop contract, then seal a claim packet for each address." },
+      { text: "Steps two and three, one dossier: build the recipient list, deploy the campaign contract, then seal a claim packet for each address." },
       { text: "Enter or import recipients, deploy, and the archive will encrypt an individual allocation for each one." },
       { text: "Cryptographically: each packet carries an encrypted amount and a one-time signature — only the named wallet can ever decrypt or redeem it." },
     ],

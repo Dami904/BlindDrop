@@ -31,6 +31,8 @@ import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanTxUrl } from "@/lib/packet
 import { formatConfidentialAmount } from "@/lib/confidential";
 import { TxHashLink, TxStatusLine } from "@/components/TxStatus";
 import { InfoTip } from "@/components/InfoTip";
+import { ErrorNote } from "@/components/ErrorNote";
+import { describeMutationError, type FriendlyError } from "@/lib/errors";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -134,6 +136,13 @@ function DisperseReceiptCard({ receipt }: { receipt: DisperseReceipt }) {
   );
 }
 
+/** Small wrapper so call sites don't need to invoke `describeMutationError` twice
+ * (once for the message, once for the detail) at every error render. */
+function MutationErrorNote({ error, fallback, className }: { error: unknown; fallback: string; className?: string }) {
+  const info = describeMutationError(error, fallback);
+  return <ErrorNote className={className} message={info.message} detail={info.detail} />;
+}
+
 function isHexAddress(value: string): value is Address {
   return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
 }
@@ -146,12 +155,15 @@ function isHexAddress(value: string): value is Address {
  * transaction reverts with `ERC7984UnauthorizedSpender(address,address)`
  * (selector `0x79f2cb38`).
  */
-function describeDisperseError(error: unknown): string {
+function describeDisperseError(error: unknown): FriendlyError {
   const raw = error instanceof Error ? error.message : String(error);
   if (raw.includes("79f2cb38") || raw.includes("UnauthorizedSpender")) {
-    return "The disperse contract isn't approved to move your tokens yet — complete the approval step above.";
+    return {
+      message: "The disperse contract isn't approved to move your tokens yet — complete the approval step above.",
+      detail: raw,
+    };
   }
-  return raw;
+  return describeMutationError(error, "Couldn't submit the disperse transaction — you can try again.");
 }
 
 type StageState = "idle" | "active" | "done";
@@ -465,7 +477,7 @@ export default function DispersePage() {
             <ChecklistItem
               n={1}
               state={registeredDone ? "done" : "active"}
-              label="Register your wallet pair — the disperse singleton deploys a dedicated wallet pair for your address to hold funds mid-transfer."
+              label="Register your wallet pair — a dedicated pair is created to hold funds briefly during the transfer."
               action={
                 <button
                   type="button"
@@ -486,16 +498,18 @@ export default function DispersePage() {
                 </p>
               )}
               {register.isError && (
-                <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
-                  {register.error?.message}
-                </p>
+                <MutationErrorNote
+                  className="mt-2"
+                  error={register.error}
+                  fallback="Couldn't register your wallet pair — you can try again."
+                />
               )}
             </ChecklistItem>
 
             <ChecklistItem
               n={2}
               state={approvedDone ? "done" : registeredDone ? "active" : "idle"}
-              label="Approve token operator — your registered wallets must be approved as ERC-7984 operators for this token before a wallet-mode disperse can move funds."
+              label="Approve token operator — your registered wallets need operator approval on this token before they can move funds."
               action={
                 <button
                   type="button"
@@ -514,9 +528,11 @@ export default function DispersePage() {
                 </p>
               )}
               {approve.isError && (
-                <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
-                  {approve.error?.message}
-                </p>
+                <MutationErrorNote
+                  className="mt-2"
+                  error={approve.error}
+                  fallback="Couldn't approve your sub-wallets — you can try again."
+                />
               )}
             </ChecklistItem>
 
@@ -548,15 +564,12 @@ export default function DispersePage() {
               }
             >
               <p className="mt-1 text-xs" style={{ color: "var(--text-dim)" }}>
-                One-time approval so the disperse contract can act as an operator
+                One-time approval so the disperse contract can move your tokens
                 <InfoTip
                   label="Operator"
                   note="An address your token explicitly allows to move funds on your behalf — revocable, time-limited."
                 />
-                — taking the total from your wallet and fanning it out. It expires after an
-                hour, and is separate from the wallet-pair approval above: the disperse
-                contract itself must be allowed to pull from your wallet before it can split
-                funds across your registered wallets.
+                and split them across recipients. Separate from the wallet-pair approval above; expires after an hour.
               </p>
               {approvedDone && isSingletonOperator.isLoading && (
                 <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
@@ -573,11 +586,11 @@ export default function DispersePage() {
                   wallet-approval vs confirming isn't observable separately. */}
               <TxStatusLine awaitingWallet={setSingletonOperator.isPending} className="mt-2" />
               {setSingletonOperator.isError && (
-                <p className="mt-2 text-xs" style={{ color: "var(--err)" }}>
-                  {setSingletonOperator.error instanceof Error
-                    ? setSingletonOperator.error.message
-                    : String(setSingletonOperator.error)}
-                </p>
+                <MutationErrorNote
+                  className="mt-2"
+                  error={setSingletonOperator.error}
+                  fallback="Couldn't approve the disperse contract — you can try again."
+                />
               )}
             </ChecklistItem>
           </div>
@@ -651,9 +664,15 @@ export default function DispersePage() {
               </div>
             )}
             {disperse.isError && (
-              <p className="callout callout-err mt-3 text-xs">
-                {disperse.error ? describeDisperseError(disperse.error) : "Disperse failed."}
-              </p>
+              <ErrorNote
+                className="mt-3"
+                message={
+                  disperse.error
+                    ? describeDisperseError(disperse.error).message
+                    : "The disperse transaction failed — you can try again."
+                }
+                detail={disperse.error ? describeDisperseError(disperse.error).detail : undefined}
+              />
             )}
             {receipt && <DisperseReceiptCard receipt={receipt} />}
           </div>

@@ -36,7 +36,7 @@ export function FaucetSection() {
               <span className="font-display mt-1 block text-xl">Need test tokens?</span>
               {!open && (
                 <span className="mt-1 block text-sm" style={{ color: "var(--text-dim)" }}>
-                  Claim the TTT / CTTT test-token pair to try the full flow.
+                  Claim the TTT / CTTT test-token pair to try the whole thing end to end.
                 </span>
               )}
             </span>

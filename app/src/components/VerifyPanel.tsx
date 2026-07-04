@@ -9,6 +9,7 @@ import { formatConfidentialAmount, describeDecryptError } from "@/lib/confidenti
 import { TokenIdentityCard } from "@/components/TokenIdentityCard";
 import { TokenSelect } from "@/components/TokenSelect";
 import { InfoTip } from "@/components/InfoTip";
+import { ErrorNote } from "@/components/ErrorNote";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -101,7 +102,7 @@ export function VerifyPanel({ initialToken, onVerified }: VerifyPanelProps) {
       )}
 
       <p className="mt-10 text-xs" style={{ color: "var(--text-faint)" }}>
-        Decryption uses your wallet&apos;s EIP-712 signature and the Zama relayer
+        Decryption uses your wallet&apos;s signature and the Zama relayer
         <InfoTip
           label="Zama relayer"
           note="The service that helps your browser encrypt and decrypt values — it never sees your keys or plaintext without your signature."
@@ -141,7 +142,7 @@ function ConfidentialBalanceSection({
     <section className="panel mt-10 p-6">
       <h2 className="font-display text-lg">Your confidential balance</h2>
       <p className="mt-1 font-data text-xs" style={{ color: "var(--text-faint)" }}>
-        Token {token} · account {account}
+        Token {token} · wallet {account}
       </p>
 
           <div className="mt-6">
@@ -149,12 +150,17 @@ function ConfidentialBalanceSection({
               <div className="flex items-center gap-3">
                 <span className="redaction inline-block h-9 w-40 rounded" />
                 <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-                  Requesting your decryption signature and reaching the relayer…
+                  Requesting your signature to decrypt…
                 </p>
               </div>
             )}
 
-            {balance.isError && <div className="callout callout-err">{describeDecryptError(balance.error)}</div>}
+            {balance.isError && (
+              <ErrorNote
+                message={describeDecryptError(balance.error).message}
+                detail={describeDecryptError(balance.error).detail}
+              />
+            )}
 
             {balance.isSuccess && (
               <div className="unseal-enter rounded-[var(--r-lg)] border px-6 py-5" style={{ borderColor: "color-mix(in srgb, var(--gold) 40%, transparent)", background: "var(--gold-dim)" }}>

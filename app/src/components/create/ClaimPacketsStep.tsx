@@ -31,6 +31,8 @@ import {
   useAutoSend,
   type AutoSendRecipient,
 } from "@/components/create/AutoSendPanel";
+import { describeMutationError, type FriendlyError } from "@/lib/errors";
+import { ErrorNote } from "@/components/ErrorNote";
 
 interface ClaimPacketsStepProps {
   recipients: RecipientRow[];
@@ -121,7 +123,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [packets, setPackets] = useState<GeneratedPacket[]>([]);
   const [stage, setStage] = useState<"encrypting" | "signing" | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
   const [copiedLinkFor, setCopiedLinkFor] = useState<string | null>(null);
 
@@ -143,7 +145,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [claimStatus, setClaimStatus] = useState<Map<string, ClaimStatus>>(new Map());
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<FriendlyError | null>(null);
 
   // Sealed packets are restored from localStorage (keyed by campaign address)
   // so an admin who navigates away or reloads lands back on their sealed list
@@ -272,7 +274,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           } else {
             failures.push({
               recipient,
-              message: result.error instanceof Error ? result.error.message : String(result.error),
+              message: describeMutationError(result.error, "Couldn't encrypt this allocation.").message,
             });
           }
           setEncryptSettled((n) => n + 1);
@@ -319,7 +321,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(describeMutationError(err, "Sealing stopped before finishing — you can retry the remaining recipients."));
     } finally {
       setIsRunning(false);
       setStage(null);
@@ -426,7 +428,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
       setClaimStatus(next);
       setLastRefreshedAt(new Date());
     } catch (err) {
-      setStatusError(err instanceof Error ? err.message : String(err));
+      setStatusError(describeMutationError(err, "Couldn't refresh claim statuses — check your connection and try again."));
     } finally {
       setIsRefreshingStatus(false);
     }
@@ -492,11 +494,8 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           )}
         </div>
         <p className="mt-2 ml-10 text-sm" style={{ color: "var(--text-dim)" }}>
-          For each recipient, an encrypted allocation is sealed to their address, then
-          admin-signed. Encryption runs in parallel (a few relayer round-trips at once); signing
-          happens one at a time — each authorization is individually signed by your wallet, so
-          approve each prompt as it appears. Nothing is sent to a server; packets stay in your
-          browser.
+          Each recipient&apos;s allocation is encrypted, then signed by your wallet — approve each
+          signing prompt as it appears. Nothing is sent to a server; packets stay in your browser.
         </p>
       </div>
 
@@ -542,7 +541,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
         </div>
       )}
 
-      {error && <p className="text-sm" style={{ color: "var(--err)" }}>{error}</p>}
+      {error && <ErrorNote message={error.message} detail={error.detail} />}
 
       {!isRunning && encryptDone && encryptFailures.length > 0 && (
         <div className="callout callout-warn callout-col">
@@ -617,7 +616,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
               {isRefreshingStatus ? "Refreshing…" : "Refresh statuses"}
             </button>
           </div>
-          {statusError && <p className="text-xs" style={{ color: "var(--err)" }}>{statusError}</p>}
+          {statusError && <ErrorNote message={statusError.message} detail={statusError.detail} />}
 
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={downloadReportCsv} className="btn btn-ghost text-xs">
@@ -722,9 +721,6 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                           </button>
                           <AutoSendStatusChip entry={autoSend.statuses.get(gp.address.toLowerCase())} />
                         </div>
-                        <p className="mt-1 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
-                          Opens a draft in your own mail app — the list never touches a server.
-                        </p>
                       </div>
                     )}
                   </div>

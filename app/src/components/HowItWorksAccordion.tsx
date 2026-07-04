@@ -28,10 +28,10 @@ const steps: Step[] = [
   {
     n: 2,
     title: "Create a distribution",
-    oneLiner: "List recipients, deploy an airdrop contract, and fund it.",
+    oneLiner: "List recipients, deploy a campaign contract, and fund it.",
     href: "/create",
     cta: "Start creating",
-    what: "List recipients, deploy an airdrop contract, and fund it with the total allocation.",
+    what: "List recipients, deploy a campaign contract, and fund it with the total allocation.",
     crypto:
       "Each recipient's amount gets encrypted client-side before it ever reaches the network, so no observer — including this app — can see who gets how much.",
   },

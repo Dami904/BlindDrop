@@ -217,7 +217,7 @@ function BalanceReveal({
   if (!balance.isSuccess) {
     return (
       <span className="text-xs" style={{ color: "var(--err)" }}>
-        {describeDecryptError(balance.error)}
+        {describeDecryptError(balance.error).message}
       </span>
     );
   }

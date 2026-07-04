@@ -11,6 +11,8 @@ import {
   useMintUnderlying,
 } from "@tokenops/sdk/testnet-faucet/react";
 import { isSepoliaChainId, SEPOLIA_CHAIN_ID, etherscanAddressUrl, etherscanTxUrl } from "@/lib/packet";
+import { describeMutationError } from "@/lib/errors";
+import { ErrorNote } from "@/components/ErrorNote";
 
 const CTTT_MINT_AMOUNT = BigInt(1_000_000_000); // 1,000 CTTT (6-decimal units)
 const TTT_MINT_AMOUNT = BigInt(1_000) * BigInt(10) ** BigInt(18); // 1,000 TTT (18-decimal units)
@@ -102,8 +104,7 @@ export function FaucetPanel() {
         {meta && (
           <p className="mt-4 text-xs" style={{ color: "var(--text-faint)" }}>
             Conversion rate: 1 {cttt?.symbol} unit is backed by {meta.rate.toString()} {ttt?.symbol}{" "}
-            base units. Both mints are open and permissionless on Sepolia — no cooldown, any
-            amount up to the confidential uint64 ceiling.
+            base units. Both mints are open on Sepolia — no cooldown, any amount.
           </p>
         )}
       </section>
@@ -136,15 +137,19 @@ export function FaucetPanel() {
             </div>
           )}
           {lastAction === "confidential" && mintConfidential.isError && (
-            <p className="callout callout-err mt-3 text-xs">{mintConfidential.error?.message ?? "Mint failed."}</p>
+            <ErrorNote
+              className="mt-3"
+              message={describeMutationError(mintConfidential.error, "Couldn't mint CTTT — you can try again.").message}
+              detail={describeMutationError(mintConfidential.error, "Couldn't mint CTTT — you can try again.").detail}
+            />
           )}
         </div>
 
         <div className="panel p-6">
           <h3 className="font-display text-base">Mint plain TTT</h3>
           <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
-            Mint 1,000 plain ERC-20 TTT — useful if you want to approve + wrap it into CTTT
-            yourself via the standard ERC-7984 flow.
+            Mint 1,000 plain ERC-20 TTT — useful if you&apos;d rather approve and wrap it into
+            CTTT yourself.
           </p>
           <button
             type="button"
@@ -167,7 +172,11 @@ export function FaucetPanel() {
             </div>
           )}
           {lastAction === "underlying" && mintUnderlying.isError && (
-            <p className="callout callout-err mt-3 text-xs">{mintUnderlying.error?.message ?? "Mint failed."}</p>
+            <ErrorNote
+              className="mt-3"
+              message={describeMutationError(mintUnderlying.error, "Couldn't mint TTT — you can try again.").message}
+              detail={describeMutationError(mintUnderlying.error, "Couldn't mint TTT — you can try again.").detail}
+            />
           )}
         </div>
       </section>

@@ -24,6 +24,8 @@ import { TokenAmountSummary } from "@/components/TokenAmountSummary";
 import type { RecipientRow } from "@/lib/csv";
 import { scaleAmountToUnits } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
+import { describeMutationError, type FriendlyError } from "@/lib/errors";
+import { ErrorNote } from "@/components/ErrorNote";
 
 export interface DeployedCampaign {
   airdrop: Address;
@@ -66,7 +68,7 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
   const [tokenAddress, setTokenAddress] = useState<string>(defaultToken);
   const [startTimestamp, setStartTimestamp] = useState<number>(now + 5 * 60);
   const [endTimestamp, setEndTimestamp] = useState<number>(now + 30 * 86400);
-  const [deployError, setDeployError] = useState<string | null>(null);
+  const [deployError, setDeployError] = useState<FriendlyError | null>(null);
 
   const create = useCreateConfidentialAirdropAndGetAddress();
   const { data: defaultGasFee } = useFactoryDefaultGasFee();
@@ -116,7 +118,7 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
         endTimestamp,
       });
     } catch (err) {
-      setDeployError(err instanceof Error ? err.message : String(err));
+      setDeployError(describeMutationError(err, "Couldn't deploy the campaign — you can try again."));
     }
   }
 
@@ -131,7 +133,7 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
   if (wrongChain) {
     return (
       <div className="callout callout-warn callout-col callout-center">
-        <p>Wrong network. BlindDrop airdrops deploy on Sepolia.</p>
+        <p>Wrong network. BlindDrop campaigns deploy on Sepolia.</p>
         <button
           type="button"
           onClick={() => switchChain({ chainId: sepolia.id })}
@@ -250,12 +252,12 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
           {/* The create hook resolves only after the receipt is parsed, so the
               wallet-approval and confirming phases can't be told apart. */}
           <TxStatusLine awaitingWallet={create.isPending} className="mt-2" />
-          {deployError && <p className="mt-2 text-sm" style={{ color: "var(--err)" }}>{deployError}</p>}
+          {deployError && <ErrorNote className="mt-2" message={deployError.message} detail={deployError.detail} />}
         </div>
       ) : (
         <div className="flex flex-col gap-4">
           <div className="callout callout-gold callout-col">
-            <p>Airdrop deployed.</p>
+            <p>Campaign deployed.</p>
             <a
               href={etherscanAddressUrl(deployed.airdrop)}
               target="_blank"
@@ -378,9 +380,8 @@ function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
     <div className="panel p-4">
       <h3 className="eyebrow">Save for later</h3>
       <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
-        Optionally register this campaign in the on-chain BlindDrop index, so you can find it again
-        after a reload. This is just a lookup aid — it costs a small gas fee, is entirely optional,
-        and never affects who can claim or fund this campaign.
+        Register this campaign in the on-chain index so you can find it again after a reload — a
+        small gas fee, purely a lookup aid, never affects who can claim or fund it.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
@@ -400,7 +401,7 @@ function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
         {registered && hash && <TxHashLink hash={hash} />}
         {isError && (
           <span className="text-xs" style={{ color: "var(--err)" }}>
-            {error instanceof Error ? error.message : String(error)}
+            {describeMutationError(error, "Couldn't save this campaign — you can try again.").message}
           </span>
         )}
         {receipt.isError && (
@@ -414,15 +415,16 @@ function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
 }
 
 /** Map a fund-mutation error to a plain-language message an admin can act on. */
-function describeFundError(error: unknown): { message: string; needsApproval: boolean } {
+function describeFundError(error: unknown): FriendlyError & { needsApproval: boolean } {
   const raw = error instanceof Error ? error.message : String(error);
   if (raw.includes("79f2cb38") || raw.includes("UnauthorizedSpender")) {
     return {
-      message: "The factory isn't approved to move your tokens yet — complete the approval step first.",
+      message: "The factory isn't approved to move your tokens yet — complete the approval step above.",
       needsApproval: true,
     };
   }
-  return { message: raw, needsApproval: false };
+  const { message, detail } = describeMutationError(error, "Couldn't fund the campaign — you can try again.");
+  return { message, detail, needsApproval: false };
 }
 
 /**
@@ -545,9 +547,10 @@ function FundingPanel({
             so wallet-approval vs confirming can't be told apart mid-flight. */}
         <TxStatusLine awaitingWallet={setOperator.isPending} className="ml-9" />
         {setOperator.isError && (
-          <p className="text-xs" style={{ color: "var(--err)" }}>
-            {setOperator.error instanceof Error ? setOperator.error.message : String(setOperator.error)}
-          </p>
+          <ErrorNote
+            message={describeMutationError(setOperator.error, "Couldn't complete the approval — you can try again.").message}
+            detail={describeMutationError(setOperator.error, "Couldn't complete the approval — you can try again.").detail}
+          />
         )}
 
         <div className="flex items-center gap-3">
@@ -585,16 +588,15 @@ function FundingPanel({
         </p>
       )}
       {fundError && (
-        <p className="mt-3 text-sm" style={{ color: "var(--err)" }}>
-          {fundError.message}
-          {!fundError.needsApproval && (
-            <>
-              {" "}
-              You can instead fund manually by transferring/wrapping confidential tokens directly to{" "}
-              <span className="font-data">{deployed.airdrop}</span>.
-            </>
-          )}
-        </p>
+        <ErrorNote
+          className="mt-3"
+          message={
+            fundError.needsApproval
+              ? fundError.message
+              : `${fundError.message} You can also fund manually by sending confidential tokens directly to ${deployed.airdrop}.`
+          }
+          detail={fundError.detail}
+        />
       )}
     </div>
   );

@@ -50,9 +50,8 @@ function ClaimContent() {
       <p className="eyebrow">Recipient intake</p>
       <h1 className="font-display mt-2 text-3xl">Claim Tokens</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
-        You&apos;re about to claim a hidden amount — then privately reveal it to yourself. Nobody
-        else can see it. Open the claim packet your airdrop admin gave you, then submit it from
-        the connected wallet it was issued to.
+        Open the claim packet your campaign admin sent you, then submit it from the wallet it was
+        issued to — only you can see the amount inside.
       </p>
 
       <div className="mt-8">
@@ -74,9 +73,8 @@ function ClaimContent() {
                 <span className="eyebrow">Stage 3 · The unsealing</span>
                 <h2 className="font-display mt-2 text-3xl">Verify your allocation</h2>
                 <p className="mt-3 text-sm" style={{ color: "var(--text-dim)" }}>
-                  Read your confidential ERC-7984 balance and decrypt it locally via the Zama
-                  relayer. Only the connected wallet can decrypt its own balance — no one else,
-                  including this app, can see the plaintext amount.
+                  Read your new confidential balance and decrypt it — only the connected wallet
+                  can unseal its own amount.
                 </p>
                 {!verifyReachable && (
                   <p className="mt-2 text-xs" style={{ color: "var(--text-faint)" }}>
