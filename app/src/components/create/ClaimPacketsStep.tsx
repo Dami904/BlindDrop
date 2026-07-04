@@ -16,6 +16,7 @@ import {
   type ClaimStatus,
   type ReportRecipientRow,
 } from "@/lib/report";
+import { AutoSendPanel, AutoSendStatusChip, useAutoSend, type AutoSendRecipient } from "@/components/create/AutoSendPanel";
 
 interface ClaimPacketsStepProps {
   recipients: RecipientRow[];
@@ -134,6 +135,18 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const packetsByAddress = new Map(packets.map((p) => [p.address.toLowerCase(), p]));
   const remaining = recipients.filter((r) => !packetsByAddress.has(r.address.toLowerCase()));
   const emailByAddress = new Map(recipients.map((r) => [r.address.toLowerCase(), r.email]));
+
+  // Recipients eligible for the optional bulk auto-send: a sealed packet
+  // and an email address, both required to build a claim link.
+  const autoSendRecipients: AutoSendRecipient[] = packets
+    .map((gp): AutoSendRecipient | null => {
+      const email = emailByAddress.get(gp.address.toLowerCase());
+      return email
+        ? { address: gp.address, email, claimLink: buildClaimLink(window.location.origin, gp.packet) }
+        : null;
+    })
+    .filter((r): r is AutoSendRecipient => r !== null);
+  const autoSend = useAutoSend(autoSendRecipients);
 
   /**
    * Runs the two-stage pipeline over `targets` (defaults to every recipient
@@ -511,6 +524,8 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
             list itself.
           </p>
 
+          <AutoSendPanel recipients={autoSendRecipients} auto={autoSend} />
+
           <div className="grid gap-3 sm:grid-cols-2">
             {packets.map((gp) => {
               const email = emailByAddress.get(gp.address.toLowerCase());
@@ -571,9 +586,26 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                     </div>
                     {email && (
                       <div className="mt-2">
-                        <a href={mailtoHref(gp, email)} className="link-gold text-xs">
-                          Email packet
-                        </a>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <a href={mailtoHref(gp, email)} className="link-gold text-xs">
+                            Email packet
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              autoSend.sendOne({
+                                address: gp.address,
+                                email,
+                                claimLink: buildClaimLink(window.location.origin, gp.packet),
+                              })
+                            }
+                            disabled={!autoSend.configComplete}
+                            className="link-gold text-xs disabled:opacity-40"
+                          >
+                            Auto-send
+                          </button>
+                          <AutoSendStatusChip entry={autoSend.statuses.get(gp.address.toLowerCase())} />
+                        </div>
                         <p className="mt-1 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
                           Opens a draft in your own mail app — the list never touches a server.
                         </p>
