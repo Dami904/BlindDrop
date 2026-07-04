@@ -103,7 +103,7 @@ export function GuideWidget() {
   if (!script) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex justify-end sm:inset-x-auto sm:right-5 sm:bottom-5">
+    <div className="fixed inset-x-0 bottom-0 z-50 flex justify-end px-3 pb-3 sm:inset-x-auto sm:right-5 sm:bottom-5 sm:p-0">
       {open && (
         <div
           ref={panelRef}
@@ -111,7 +111,7 @@ export function GuideWidget() {
           aria-modal="true"
           aria-label="The Archivist — page guide"
           tabIndex={-1}
-          className="panel unseal-enter mx-3 mb-3 flex max-h-[70vh] w-full flex-col overflow-hidden sm:mx-0 sm:mb-3 sm:w-[22rem]"
+          className="panel unseal-enter flex max-h-[70vh] w-full flex-col overflow-hidden sm:mb-3 sm:w-[22rem]"
         >
           <div className="divider-stamped flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -187,7 +187,7 @@ export function GuideWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close the Archivist guide" : "Open the Archivist guide"}
         aria-expanded={open}
-        className="seal-badge mr-3 mb-3 h-11 w-11 shrink-0 !text-base shadow-lg sm:mr-0"
+        className="seal-badge h-11 w-11 shrink-0 !text-base shadow-lg"
         data-state={open ? "active" : undefined}
       >
         {open ? "✕" : "?"}
