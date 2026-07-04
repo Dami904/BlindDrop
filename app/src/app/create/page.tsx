@@ -42,7 +42,7 @@ export default function CreatePage() {
         <YourCampaigns />
       </div>
 
-      <ol className="mt-2 flex items-center gap-3 text-sm">
+      <ol className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         {STEPS.map((s, i) => {
           const state = step === s.id ? "active" : s.id < step ? "done" : undefined;
           const reachable =
