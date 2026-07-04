@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { useClaim } from "@tokenops/sdk/fhe-airdrop/react";
+import { useClaim, useGetClaimAmount } from "@tokenops/sdk/fhe-airdrop/react";
 import { isTokenOpsSdkError } from "@tokenops/sdk/fhe-airdrop";
+import { useDecryptValues, useMetadata } from "@zama-fhe/react-sdk";
 import {
   etherscanAddressUrl,
   etherscanTxUrl,
@@ -17,6 +18,9 @@ import {
   type ClaimPacket,
 } from "@/lib/packet";
 import { TxStatusLine } from "@/components/TxStatus";
+import { describeDecryptError, formatConfidentialAmount } from "@/lib/confidential";
+
+const CONFIDENTIAL_DECIMALS = 6;
 
 type LoadState =
   | { kind: "idle" }
@@ -275,12 +279,10 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
                   {claim.isSuccess ? "Claimed" : claim.isPending ? "Submitting…" : "Not yet claimed"}
                 </dd>
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt style={{ color: "var(--text-dim)" }}>Allocation</dt>
-                <dd>
-                  <span className="redaction px-2 py-0.5 text-sm">sealed</span>
-                </dd>
-              </div>
+              <AllocationReveal
+                packet={packet}
+                canReveal={!recipientMismatch && !wrongChain && isConnected}
+              />
             </dl>
 
             {recipientMismatch && (
@@ -350,6 +352,103 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
         one-time claim.
       </p>
     </div>
+  );
+}
+
+/**
+ * "Reveal my exact allocation" — uses the airdrop's dedicated
+ * `getClaimAmount` mechanism instead of the claim flow. This is a WRITE
+ * transaction (costs gas): it verifies the admin-signed allocation and
+ * grants the caller decrypt access to the encrypted `euint64` amount handle
+ * (an on-chain ACL grant via `FHE.allow`, extracted from the receipt — never
+ * simulated). It does NOT consume the claim, so it works before or after the
+ * recipient has submitted their claim.
+ *
+ * Mounted only once `packet` exists (a validated, non-optional prop) so the
+ * `useGetClaimAmount`/`useDecryptValues` hooks never construct a client from
+ * an undefined address — same crash-trap discipline as
+ * `TokenIdentityCard`'s `BalanceReveal` and `VerifyPanel`'s
+ * `ConfidentialBalanceSection`.
+ */
+function AllocationReveal({ packet, canReveal }: { packet: ClaimPacket; canReveal: boolean }) {
+  const getClaimAmount = useGetClaimAmount({ address: packet.airdrop });
+  const handle = getClaimAmount.data?.handle;
+
+  // Auto-fires (EIP-712 signature prompt via the Zama relayer) as soon as the
+  // handle lands from the getClaimAmount receipt. The handle was granted ACL
+  // access on the airdrop contract (that's where `encryptUint64` bound the
+  // ciphertext and where `FHE.allow` ran), so `contractAddress` is the
+  // airdrop address, not the token address.
+  const decrypt = useDecryptValues(handle ? [{ encryptedValue: handle, contractAddress: packet.airdrop }] : [], {
+    enabled: !!handle,
+    retry: false,
+  });
+
+  // Best-effort symbol lookup so the revealed amount can read "1,000 BLIND"
+  // instead of a bare number — never blocks the reveal if it's slow/fails.
+  const tokenMetadata = useMetadata(packet.token);
+  const symbol = tokenMetadata.data?.symbol;
+
+  const revealedRaw = handle ? decrypt.data?.[handle] : undefined;
+  const revealed = typeof revealedRaw === "bigint" ? revealedRaw : undefined;
+
+  const busy = getClaimAmount.isPending || (!!handle && decrypt.isFetching && revealed === undefined);
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <dt style={{ color: "var(--text-dim)" }}>Allocation</dt>
+        <dd>
+          {revealed !== undefined ? (
+            <span className="unseal-enter font-data tabular text-sm" style={{ color: "var(--gold-bright)" }}>
+              {formatConfidentialAmount(revealed, CONFIDENTIAL_DECIMALS)}
+              {symbol ? ` ${symbol}` : ""}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <span className="redaction px-2 py-0.5 text-sm">sealed</span>
+              <button
+                type="button"
+                disabled={!canReveal || busy}
+                onClick={() =>
+                  getClaimAmount.mutate({
+                    encryptedInput: packet.encryptedInput,
+                    signature: packet.signature,
+                  })
+                }
+                className="btn-quiet text-xs"
+              >
+                {busy ? "Revealing…" : "Reveal amount"}
+              </button>
+            </span>
+          )}
+        </dd>
+      </div>
+
+      {(getClaimAmount.isPending || (!!handle && decrypt.isLoading)) && (
+        <div className="flex justify-end">
+          {getClaimAmount.isPending ? (
+            <TxStatusLine awaitingWallet className="justify-end" />
+          ) : (
+            <p className="font-data flex items-center gap-2 text-xs" style={{ color: "var(--text-dim)" }} role="status" aria-live="polite">
+              Decrypting…
+            </p>
+          )}
+        </div>
+      )}
+
+      {getClaimAmount.isError && (
+        <div className="callout callout-err">{describeClaimError(getClaimAmount.error)}</div>
+      )}
+      {handle && decrypt.isError && (
+        <div className="callout callout-err">{describeDecryptError(decrypt.error)}</div>
+      )}
+
+      <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+        Costs a small gas fee. Reveals what this packet grants you — only to you, and without
+        claiming it.
+      </p>
+    </>
   );
 }
 
