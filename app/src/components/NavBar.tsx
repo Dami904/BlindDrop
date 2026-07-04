@@ -28,7 +28,7 @@ export function NavBar() {
         backdropFilter: "blur(10px)",
       }}
     >
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-4 min-[480px]:gap-4 min-[480px]:px-6">
         <Link
           href="/"
           onClick={() => setOpen(false)}
@@ -59,7 +59,7 @@ export function NavBar() {
             );
           })}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 shrink items-center gap-2">
           <ThemeToggle className="hidden min-[480px]:inline-flex" />
           <NetworkBadge className="hidden min-[480px]:inline-flex" />
           <ConnectButton />
