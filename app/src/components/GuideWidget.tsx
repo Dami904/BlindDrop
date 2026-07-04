@@ -26,24 +26,30 @@ export function GuideWidget() {
   const [visibleCount, setVisibleCount] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
-  const hasAutoOpenedRef = useRef(false);
+  const [beckon, setBeckon] = useState(false);
 
-  // Auto-open exactly once, on the user's first ever visit to any scripted route.
+  // Never auto-open (a panel over the hero is a hostile first impression).
+  // Instead, on the user's first ever visit, pulse the launcher and show a
+  // small dismissable hint bubble inviting them in.
   useEffect(() => {
-    if (!script || hasAutoOpenedRef.current) return;
+    if (!script) return;
     try {
       const visited = window.localStorage.getItem(STORAGE_KEY);
       if (!visited) {
-        hasAutoOpenedRef.current = true;
-        setOpen(true);
+        setBeckon(true);
         window.localStorage.setItem(STORAGE_KEY, "1");
       }
     } catch {
-      // localStorage unavailable (private mode, etc.) — skip auto-open.
+      // localStorage unavailable (private mode, etc.) — skip the hint.
     }
     // Only ever evaluate this once per mount of a scripted route sequence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  // The hint retires as soon as the guide is opened once.
+  useEffect(() => {
+    if (open) setBeckon(false);
+  }, [open]);
 
   // Reset + stagger the message reveal whenever the panel opens on a new script.
   useEffect(() => {
@@ -181,17 +187,27 @@ export function GuideWidget() {
         </div>
       )}
 
-      <button
-        ref={launcherRef}
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? "Close the Archivist guide" : "Open the Archivist guide"}
-        aria-expanded={open}
-        className="seal-badge h-11 w-11 shrink-0 !text-base shadow-lg"
-        data-state={open ? "active" : undefined}
-      >
-        {open ? "✕" : "?"}
-      </button>
+      <span className="flex items-end gap-2">
+        {beckon && !open && (
+          <span
+            className="panel-paper unseal-enter hidden px-3 py-1.5 text-xs sm:inline-block"
+            style={{ color: "var(--callout-gold-text)" }}
+          >
+            First time? The Archivist can walk you through.
+          </span>
+        )}
+        <button
+          ref={launcherRef}
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={open ? "Close the Archivist guide" : "Open the Archivist guide"}
+          aria-expanded={open}
+          className={`seal-badge h-11 w-11 shrink-0 !text-base shadow-lg ${beckon && !open ? "guide-beckon" : ""}`}
+          data-state={open ? "active" : undefined}
+        >
+          {open ? "✕" : "?"}
+        </button>
+      </span>
     </div>
   );
 }

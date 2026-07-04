@@ -730,3 +730,15 @@ body {
     transform: none;
   }
 }
+
+/* Guide launcher first-visit beckon: gentle pulse until opened once */
+@keyframes guide-beckon-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--seal-dim); }
+  50% { box-shadow: 0 0 0 8px transparent; }
+}
+.guide-beckon {
+  animation: guide-beckon-pulse 2s var(--ease-out) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-beckon { animation: none; }
+}
