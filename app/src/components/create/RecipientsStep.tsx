@@ -138,9 +138,9 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
     [validated.valid]
   );
 
-  function appendRows(rows: { address: string; amount: string }[], errorRows: RecipientRowError[], duplicates: string[]) {
+  function appendRows(rows: { address: string; amount: string; email?: string }[], errorRows: RecipientRowError[], duplicates: string[]) {
     const newEntries: RecipientEntry[] = [
-      ...rows.map((r) => ({ ...newRecipientEntry(), address: r.address, amount: r.amount })),
+      ...rows.map((r) => ({ ...newRecipientEntry(), address: r.address, amount: r.amount, email: r.email ?? "" })),
       // Failed rows become editable entries too, pre-filled with the raw
       // (invalid) values, so the visitor can fix them in place instead of
       // re-uploading the file.
@@ -352,6 +352,15 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                     </div>
                     <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
                   </div>
+                  <div className="mt-2">
+                    <label className="label">Email (optional)</label>
+                    <input
+                      value={entry.email ?? ""}
+                      onChange={(e) => updateEntry(entry.id, { email: e.target.value })}
+                      placeholder="email (optional)"
+                      className="field mt-1 text-xs"
+                    />
+                  </div>
                   {error && (
                     <p className="mt-1 text-xs" style={{ color: "var(--err)" }}>
                       {error}
@@ -374,6 +383,9 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                   </th>
                   <th className="px-3 py-2 text-left font-data text-xs uppercase tracking-wide font-normal" style={{ color: "var(--text-dim)" }}>
                     Amount
+                  </th>
+                  <th className="px-3 py-2 text-left font-data text-xs uppercase tracking-wide font-normal" style={{ color: "var(--text-dim)" }}>
+                    Email
                   </th>
                   <th className="px-3 py-2"></th>
                 </tr>
@@ -403,13 +415,22 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
                             style={{ color: "var(--text)", borderColor: badField === "amount" ? "var(--err)" : "transparent" }}
                           />
                         </td>
+                        <td className="px-3 py-1.5">
+                          <input
+                            value={entry.email ?? ""}
+                            onChange={(e) => updateEntry(entry.id, { email: e.target.value })}
+                            placeholder="email (optional)"
+                            className="w-full rounded border bg-transparent px-2 py-1 text-xs focus:outline-none"
+                            style={{ color: "var(--text)", borderColor: "transparent" }}
+                          />
+                        </td>
                         <td className="px-3 py-1.5 text-right">
                           <RemoveRecipientButton onClick={() => removeEntry(entry.id)} />
                         </td>
                       </tr>
                       {error && (
                         <tr style={{ borderColor: "var(--line)" }}>
-                          <td colSpan={3} className="px-3 pt-0 pb-1.5 text-xs" style={{ color: "var(--err)" }}>
+                          <td colSpan={4} className="px-3 pt-0 pb-1.5 text-xs" style={{ color: "var(--err)" }}>
                             {error}
                           </td>
                         </tr>

@@ -101,6 +101,58 @@ describe("parseRecipientsCsv", () => {
     expect(result.duplicates).toEqual([ADDR_1]);
     expect(result.errors).toEqual([]);
   });
+
+  it("accepts aliased header names (wallet/value)", () => {
+    const raw = `wallet,value\n${ADDR_1},1.5`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 2, address: ADDR_1, amount: "1.5", email: undefined }]);
+  });
+
+  it("accepts aliased header names case-insensitively (Wallet_Address/USDC_Amount)", () => {
+    const raw = `Wallet_Address,USDC_Amount\n${ADDR_1},2`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 2, address: ADDR_1, amount: "2", email: undefined }]);
+  });
+
+  it("maps columns by name when header order is swapped", () => {
+    const raw = `amount,address\n1.5,${ADDR_1}`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 2, address: ADDR_1, amount: "1.5", email: undefined }]);
+  });
+
+  it("leaves headerless positional parsing unchanged", () => {
+    const raw = `${ADDR_1},1.5\n${ADDR_2},2`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([
+      { line: 1, address: ADDR_1, amount: "1.5" },
+      { line: 2, address: ADDR_2, amount: "2" },
+    ]);
+  });
+
+  it("parses an optional email column via header (recipient/allocation/email)", () => {
+    const raw = `recipient,allocation,email\n${ADDR_1},1,alice@example.com`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 2, address: ADDR_1, amount: "1", email: "alice@example.com" }]);
+  });
+
+  it("parses an optional email column positionally when it looks like an email", () => {
+    const raw = `${ADDR_1},1,alice@example.com`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 1, address: ADDR_1, amount: "1", email: "alice@example.com" }]);
+  });
+
+  it("ignores a positional third column that doesn't look like an email", () => {
+    const raw = `${ADDR_1},1,notanemail`;
+    const result = parseRecipientsCsv(raw);
+    expect(result.errors).toEqual([]);
+    expect(result.rows).toEqual([{ line: 1, address: ADDR_1, amount: "1", email: undefined }]);
+  });
 });
 
 describe("isValidPositiveAmount", () => {
@@ -170,6 +222,18 @@ describe("validateRecipientEntries", () => {
     expect(result.valid).toEqual([{ line: 1, address: ADDR_1, amount: "1" }]);
     expect(result.duplicateIds).toEqual(["b"]);
     expect(result.errorsById.b).toBe(`Duplicate address: ${ADDR_1}`);
+  });
+
+  it("carries an optional email through to the validated row", () => {
+    const result = validateRecipientEntries([
+      { id: "a", address: ADDR_1, amount: "1", email: " alice@example.com " },
+    ]);
+    expect(result.valid).toEqual([{ line: 1, address: ADDR_1, amount: "1", email: "alice@example.com" }]);
+  });
+
+  it("leaves email undefined when not provided", () => {
+    const result = validateRecipientEntries([entry("a", ADDR_1, "1")]);
+    expect(result.valid).toEqual([{ line: 1, address: ADDR_1, amount: "1", email: undefined }]);
   });
 });
 

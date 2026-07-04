@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useChainId, useSwitchChain, useWriteContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
+import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
 import { useZamaSDK, useConfidentialIsOperator, useConfidentialSetOperator } from "@zama-fhe/react-sdk";
 import type { ZamaSDK } from "@zama-fhe/sdk";
 import {
@@ -269,6 +270,8 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
             <TokenIdentityCard address={deployed.token} compact className="mt-2" />
           </div>
 
+          <SaveToRegistry deployed={deployed} />
+
           {address && (
             <FundingPanel
               deployed={deployed}
@@ -286,6 +289,53 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Opt-in "Save to my campaigns" action — registers the deployed campaign in
+ * BlindDropRegistry so it can be found again after a page reload. Costs one
+ * small gas-only transaction; never required to use the campaign. The
+ * registry is purely an index/cache, never a source of claim/fund
+ * authorization, so declining to save (or the tx failing) has no effect on
+ * the campaign itself.
+ */
+function SaveToRegistry({ deployed }: { deployed: DeployedCampaign }) {
+  const { writeContract, isPending, isSuccess, isError, error } = useWriteContract();
+
+  function handleSave() {
+    writeContract({
+      address: BLINDDROP_REGISTRY_ADDRESS,
+      abi: blindDropRegistryAbi,
+      functionName: "registerCampaign",
+      args: [deployed.airdrop, deployed.token],
+    });
+  }
+
+  return (
+    <div className="panel p-4">
+      <h3 className="eyebrow">Save for later</h3>
+      <p className="mt-2 text-sm" style={{ color: "var(--text-dim)" }}>
+        Optionally register this campaign in the on-chain BlindDrop index, so you can find it again
+        after a reload. This is just a lookup aid — it costs a small gas fee, is entirely optional,
+        and never affects who can claim or fund this campaign.
+      </p>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isPending || isSuccess}
+          className="btn btn-gold text-xs"
+        >
+          {isSuccess ? "Registered ✓" : isPending ? "Saving…" : "Save to my campaigns"}
+        </button>
+        {isError && (
+          <span className="text-xs" style={{ color: "var(--err)" }}>
+            {error instanceof Error ? error.message : String(error)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

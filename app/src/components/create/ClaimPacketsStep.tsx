@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useZamaSDK } from "@zama-fhe/react-sdk";
 import { encryptUint64, useSignClaimAuthorization } from "@tokenops/sdk/fhe-airdrop/react";
 import type { Address, Hex } from "viem";
-import { SEPOLIA_CHAIN_ID, type ClaimPacket } from "@/lib/packet";
+import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet";
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
@@ -86,6 +86,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedFor, setCopiedFor] = useState<string | null>(null);
+  const [copiedLinkFor, setCopiedLinkFor] = useState<string | null>(null);
 
   // Stage 1 (encryption) is parallelized, so its progress is just a settled
   // count — there's no single "current recipient" while several requests
@@ -103,6 +104,7 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const total = recipients.length;
   const packetsByAddress = new Map(packets.map((p) => [p.address.toLowerCase(), p]));
   const remaining = recipients.filter((r) => !packetsByAddress.has(r.address.toLowerCase()));
+  const emailByAddress = new Map(recipients.map((r) => [r.address.toLowerCase(), r.email]));
 
   /**
    * Runs the two-stage pipeline over `targets` (defaults to every recipient
@@ -221,6 +223,20 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
     setTimeout(() => setCopiedFor((c) => (c === gp.address ? null : c)), 1500);
   }
 
+  function copyClaimLink(gp: GeneratedPacket) {
+    const link = buildClaimLink(window.location.origin, gp.packet);
+    navigator.clipboard?.writeText(link);
+    setCopiedLinkFor(gp.address);
+    setTimeout(() => setCopiedLinkFor((c) => (c === gp.address ? null : c)), 1500);
+  }
+
+  function mailtoHref(gp: GeneratedPacket, email: string): string {
+    const link = buildClaimLink(window.location.origin, gp.packet);
+    const subject = "Your BlindDrop claim link";
+    const body = `You've been allocated a confidential token airdrop.\n\nClaim it here:\n${link}\n\nOnly you can open and decrypt this claim — keep the link private.`;
+    return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
   function downloadAll() {
     downloadJson(`claim-packets-${deployed.airdrop}.json`, packets.map((p) => p.packet));
   }
@@ -327,34 +343,54 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {packets.map((gp) => (
-              <div key={gp.address} className="envelope-card">
-                <div className="envelope-flap" aria-hidden />
-                <div className="relative z-10 p-4 pt-12">
-                  <p className="eyebrow">Sealed packet</p>
-                  <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text)" }}>
-                    {gp.address}
-                  </p>
-                  <div className="mt-3 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => copyBase64(gp)}
-                      className="link-gold text-xs"
-                    >
-                      {copiedFor === gp.address ? "Copied!" : "Copy as base64"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadJson(`claim-packet-${gp.address}.json`, gp.packet)}
-                      className="text-xs"
-                      style={{ color: "var(--text-dim)" }}
-                    >
-                      Download JSON
-                    </button>
+            {packets.map((gp) => {
+              const email = emailByAddress.get(gp.address.toLowerCase());
+              return (
+                <div key={gp.address} className="envelope-card">
+                  <div className="envelope-flap" aria-hidden />
+                  <div className="relative z-10 p-4 pt-12">
+                    <p className="eyebrow">Sealed packet</p>
+                    <p className="font-data mt-1 break-all text-xs" style={{ color: "var(--text)" }}>
+                      {gp.address}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => copyClaimLink(gp)}
+                        className="link-gold text-xs"
+                      >
+                        {copiedLinkFor === gp.address ? "Copied!" : "Copy claim link"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copyBase64(gp)}
+                        className="link-gold text-xs"
+                      >
+                        {copiedFor === gp.address ? "Copied!" : "Copy as base64"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadJson(`claim-packet-${gp.address}.json`, gp.packet)}
+                        className="text-xs"
+                        style={{ color: "var(--text-dim)" }}
+                      >
+                        Download JSON
+                      </button>
+                    </div>
+                    {email && (
+                      <div className="mt-2">
+                        <a href={mailtoHref(gp, email)} className="link-gold text-xs">
+                          Email packet
+                        </a>
+                        <p className="mt-1 text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+                          Opens a draft in your own mail app — the list never touches a server.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

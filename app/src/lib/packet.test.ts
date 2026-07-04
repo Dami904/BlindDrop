@@ -5,6 +5,10 @@ import {
   isSameAddress,
   isSepoliaChainId,
   SEPOLIA_CHAIN_ID,
+  toBase64Url,
+  fromBase64Url,
+  looksLikeClaimLinkFragment,
+  buildClaimLink,
   type ClaimPacket,
 } from "./packet";
 
@@ -207,5 +211,59 @@ describe("isSepoliaChainId", () => {
     expect(isSepoliaChainId(1)).toBe(false);
     expect(isSepoliaChainId(undefined)).toBe(false);
     expect(isSepoliaChainId(null)).toBe(false);
+  });
+});
+
+describe("base64url helpers", () => {
+  it("round-trips arbitrary JSON text, including chars that need + / = in standard base64", () => {
+    const text = JSON.stringify(validPacket());
+    const encoded = toBase64Url(text);
+    expect(fromBase64Url(encoded)).toBe(text);
+  });
+
+  it("round-trips text likely to produce + and / in standard base64", () => {
+    // Binary-ish content chosen to exercise both substitution chars.
+    const text = "ûÿ".repeat(20) + JSON.stringify({ a: 1, b: "??>>++//" });
+    const encoded = toBase64Url(text);
+    expect(encoded).not.toMatch(/[+/=]/);
+    expect(fromBase64Url(encoded)).toBe(text);
+  });
+
+  it("never contains +, /, or = padding", () => {
+    const encoded = toBase64Url(JSON.stringify(validPacket()));
+    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  it("throws when decoding garbage that isn't valid base64", () => {
+    expect(() => fromBase64Url("not valid base64!! @@")).toThrow();
+  });
+
+  it("builds a claim link containing the origin and encoded packet", () => {
+    const packet = validPacket();
+    const link = buildClaimLink("https://example.com", packet);
+    expect(link.startsWith("https://example.com/claim#pkt=")).toBe(true);
+    const encoded = link.split("#pkt=")[1];
+    expect(JSON.parse(fromBase64Url(encoded))).toEqual(packet);
+  });
+});
+
+describe("looksLikeClaimLinkFragment", () => {
+  it("accepts a plausible base64url fragment", () => {
+    const encoded = toBase64Url(JSON.stringify(validPacket()));
+    expect(looksLikeClaimLinkFragment(encoded)).toBe(true);
+  });
+
+  it("detects a truncated fragment as still plausible base64url", () => {
+    const encoded = toBase64Url(JSON.stringify(validPacket()));
+    const truncated = encoded.slice(0, Math.floor(encoded.length / 2));
+    expect(looksLikeClaimLinkFragment(truncated)).toBe(true);
+    // Truncation typically breaks JSON parsing even when decode succeeds.
+    expect(() => JSON.parse(fromBase64Url(truncated))).toThrow();
+  });
+
+  it("rejects short or non-base64url-charset strings", () => {
+    expect(looksLikeClaimLinkFragment("abc")).toBe(false);
+    expect(looksLikeClaimLinkFragment("not a fragment!! with spaces")).toBe(false);
+    expect(looksLikeClaimLinkFragment("")).toBe(false);
   });
 });

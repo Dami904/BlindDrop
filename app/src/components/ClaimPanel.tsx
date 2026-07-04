@@ -8,8 +8,10 @@ import { isTokenOpsSdkError } from "@tokenops/sdk/fhe-airdrop";
 import {
   etherscanAddressUrl,
   etherscanTxUrl,
+  fromBase64Url,
   isSameAddress,
   isSepoliaChainId,
+  looksLikeClaimLinkFragment,
   parsePacketText,
   SEPOLIA_CHAIN_ID,
   type ClaimPacket,
@@ -109,6 +111,42 @@ export function ClaimPanel({ onClaimed, onPacketLoaded }: ClaimPanelProps) {
     },
     [loadFromText]
   );
+
+  // Claim links (feature: shareable per-recipient URLs) embed the packet as
+  // `#pkt=<base64url JSON>`. Handle it on mount and on hashchange (a visitor
+  // could paste/replace the link without a full reload), then clear the hash
+  // so the packet doesn't linger in the address bar/browser history.
+  useEffect(() => {
+    function handleHashPacket() {
+      const hash = window.location.hash;
+      if (!hash.startsWith("#pkt=")) return;
+      const encoded = hash.slice("#pkt=".length);
+
+      let decoded: string | undefined;
+      try {
+        decoded = fromBase64Url(encoded);
+        JSON.parse(decoded); // throws on truncated/corrupt payloads even when decoding "succeeds"
+      } catch {
+        decoded = undefined;
+      }
+
+      if (decoded !== undefined) {
+        loadFromText(decoded);
+      } else if (looksLikeClaimLinkFragment(encoded)) {
+        setLoadState({
+          kind: "error",
+          message:
+            "This claim link looks incomplete — ask the sender to re-copy the full link, or use the packet file instead.",
+        });
+      }
+
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+
+    handleHashPacket();
+    window.addEventListener("hashchange", handleHashPacket);
+    return () => window.removeEventListener("hashchange", handleHashPacket);
+  }, [loadFromText]);
 
   const recipientMismatch = useMemo(() => {
     if (!packet || !address) return false;

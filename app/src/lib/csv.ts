@@ -14,6 +14,8 @@ export interface RecipientRow {
   address: `0x${string}`;
   /** Human-entered decimal amount, e.g. "12.5". */
   amount: string;
+  /** Optional delivery email, from a header column or a loosely-matched third positional column. */
+  email?: string;
 }
 
 export interface RecipientRowError {
@@ -29,13 +31,49 @@ export interface ParseRecipientsResult {
   duplicates: string[];
 }
 
+// Header-row aliases (case-insensitive) recognized for each column. When the
+// first line matches at least an address alias and an amount alias, columns
+// are mapped by name (supporting any order); otherwise columns are read
+// positionally as before.
+const ADDRESS_HEADER_ALIASES = new Set(["address", "wallet", "wallet_address", "recipient"]);
+const AMOUNT_HEADER_ALIASES = new Set(["amount", "value", "tokens", "usdc_amount", "allocation"]);
+const EMAIL_HEADER_ALIASES = new Set(["email", "mail", "e-mail"]);
+
+/** Loose email check — good enough to distinguish an email column from other data, not full RFC validation. */
+const LOOSE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface HeaderMap {
+  addressIdx: number;
+  amountIdx: number;
+  emailIdx?: number;
+}
+
+/** Detects a recognized header row and returns the column mapping, or undefined if `parts` isn't a header. */
+function detectHeaderMap(parts: string[]): HeaderMap | undefined {
+  let addressIdx = -1;
+  let amountIdx = -1;
+  let emailIdx: number | undefined;
+  parts.forEach((raw, idx) => {
+    const key = raw.trim().toLowerCase();
+    if (ADDRESS_HEADER_ALIASES.has(key)) addressIdx = idx;
+    else if (AMOUNT_HEADER_ALIASES.has(key)) amountIdx = idx;
+    else if (EMAIL_HEADER_ALIASES.has(key)) emailIdx = idx;
+  });
+  if (addressIdx === -1 || amountIdx === -1) return undefined;
+  return { addressIdx, amountIdx, emailIdx };
+}
+
 /**
  * Parse raw CSV/paste text into validated recipient rows.
  *
  * Accepted line formats: `address,amount` or `address amount` or
- * `address\tamount`. Blank lines and a leading header row (e.g.
- * "address,amount") are skipped. Later duplicate addresses are dropped
- * (first occurrence wins) and reported in `duplicates`.
+ * `address\tamount`, optionally followed by a third email column. A leading
+ * header row is recognized via case-insensitive aliases (address|wallet|
+ * wallet_address|recipient, amount|value|tokens|usdc_amount|allocation,
+ * email|mail|e-mail) in any column order; without a recognized header,
+ * columns are read positionally (address, amount, then a loosely-matched
+ * email). Later duplicate addresses are dropped (first occurrence wins) and
+ * reported in `duplicates`.
  */
 export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
   const lines = raw.split(/\r\n|\r|\n/);
@@ -43,6 +81,7 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
   const errors: RecipientRowError[] = [];
   const duplicates: string[] = [];
   const seen = new Set<string>();
+  let headerMap: HeaderMap | undefined;
 
   lines.forEach((rawLine, idx) => {
     const line = idx + 1;
@@ -51,15 +90,37 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
     if (trimmed.startsWith("#")) return; // allow comments
 
     const parts = trimmed.split(/[,\s\t]+/).filter(Boolean);
-    if (parts.length < 2) {
-      errors.push({ line, raw: rawLine, message: "Expected `address,amount`" });
-      return;
-    }
-    const [addressRaw, amountRaw] = parts;
 
-    // Skip an optional header row.
-    if (line === 1 && /^address$/i.test(addressRaw) && /^amount$/i.test(amountRaw)) {
-      return;
+    // Recognize an optional header row (first line only).
+    if (line === 1) {
+      const map = detectHeaderMap(parts);
+      if (map) {
+        headerMap = map;
+        return;
+      }
+    }
+
+    let addressRaw: string | undefined;
+    let amountRaw: string | undefined;
+    let emailRaw: string | undefined;
+
+    if (headerMap) {
+      const maxIdx = Math.max(headerMap.addressIdx, headerMap.amountIdx, headerMap.emailIdx ?? 0);
+      if (parts.length <= maxIdx) {
+        errors.push({ line, raw: rawLine, message: "Expected `address,amount`" });
+        return;
+      }
+      addressRaw = parts[headerMap.addressIdx];
+      amountRaw = parts[headerMap.amountIdx];
+      emailRaw = headerMap.emailIdx !== undefined ? parts[headerMap.emailIdx] : undefined;
+    } else {
+      if (parts.length < 2) {
+        errors.push({ line, raw: rawLine, message: "Expected `address,amount`" });
+        return;
+      }
+      [addressRaw, amountRaw] = parts;
+      // Positional third column — only treated as email when it looks like one.
+      emailRaw = parts[2] && LOOSE_EMAIL_RE.test(parts[2]) ? parts[2] : undefined;
     }
 
     if (!isAddress(addressRaw)) {
@@ -81,7 +142,7 @@ export function parseRecipientsCsv(raw: string): ParseRecipientsResult {
     }
     seen.add(key);
 
-    rows.push({ line, address: checksummed, amount: amountRaw });
+    rows.push({ line, address: checksummed, amount: amountRaw, email: emailRaw });
   });
 
   return { rows, errors, duplicates };
@@ -120,6 +181,8 @@ export interface RecipientEntry {
   id: string;
   address: string;
   amount: string;
+  /** Optional delivery email, typed manually in the entry table. */
+  email?: string;
 }
 
 export interface ValidatedRecipients {
@@ -167,7 +230,8 @@ export function validateRecipientEntries(entries: RecipientEntry[]): ValidatedRe
       return;
     }
     seen.add(key);
-    valid.push({ line: idx + 1, address: checksummed, amount });
+    const email = entry.email?.trim();
+    valid.push({ line: idx + 1, address: checksummed, amount, email: email || undefined });
   });
 
   return { valid, errorsById, duplicateIds };
@@ -179,6 +243,7 @@ export function newRecipientEntry(): RecipientEntry {
     id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
     address: "",
     amount: "",
+    email: "",
   };
 }
 

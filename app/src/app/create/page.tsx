@@ -5,6 +5,7 @@ import type { Hex } from "viem";
 import { RecipientsStep } from "@/components/create/RecipientsStep";
 import { CampaignStep, type DeployedCampaign } from "@/components/create/CampaignStep";
 import { ClaimPacketsStep } from "@/components/create/ClaimPacketsStep";
+import { YourCampaigns } from "@/components/create/YourCampaigns";
 import { newRecipientEntry, validateRecipientEntries, type RecipientEntry } from "@/lib/csv";
 
 function randomSalt(): Hex {
@@ -37,7 +38,11 @@ export default function CreatePage() {
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>
 
-      <ol className="mt-10 flex items-center gap-3 text-sm">
+      <div className="mt-8">
+        <YourCampaigns />
+      </div>
+
+      <ol className="mt-2 flex items-center gap-3 text-sm">
         {STEPS.map((s, i) => {
           const state = step === s.id ? "active" : s.id < step ? "done" : undefined;
           const reachable =

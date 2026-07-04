@@ -163,3 +163,51 @@ export function etherscanAddressUrl(address: string): string {
 export function etherscanTxUrl(hash: string): string {
   return `https://sepolia.etherscan.io/tx/${hash}`;
 }
+
+// --- Claim links: base64url-encoded packets embedded in a URL fragment ---
+//
+// Standard base64 uses `+`, `/`, and `=` padding, all of which are awkward or
+// unsafe in a URL fragment. base64url swaps `+`/`/` for `-`/`_` and drops
+// padding, per RFC 4648 §5. These are pure string transforms (no crypto) so
+// they're trivially unit-testable without a browser or Buffer polyfill.
+
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+
+/** UTF-8-safe base64url encode, for embedding a claim packet in a URL fragment (`#pkt=...`). */
+export function toBase64Url(text: string): string {
+  const b64 =
+    typeof btoa === "function"
+      ? btoa(unescape(encodeURIComponent(text)))
+      : Buffer.from(text, "utf-8").toString("base64");
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Inverse of {@link toBase64Url}. Throws on malformed input — callers should catch and fall back. */
+export function fromBase64Url(encoded: string): string {
+  const b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  return typeof atob === "function"
+    ? decodeURIComponent(
+        atob(padded)
+          .split("")
+          .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+          .join("")
+      )
+    : Buffer.from(padded, "base64").toString("utf-8");
+}
+
+/**
+ * True when `value` is plausibly the base64url payload of a claim link
+ * (non-trivial length, base64url charset) even if it fails to decode or
+ * parse — used to distinguish "this link was truncated in transit" from
+ * "this isn't a claim link at all" when a `#pkt=` fragment doesn't resolve
+ * to a valid packet.
+ */
+export function looksLikeClaimLinkFragment(value: string): boolean {
+  return value.length > 8 && BASE64URL_RE.test(value);
+}
+
+/** Build a shareable claim-link URL (origin + `/claim#pkt=<base64url packet>`) for one recipient's packet. */
+export function buildClaimLink(origin: string, packet: ClaimPacket): string {
+  return `${origin}/claim#pkt=${toBase64Url(JSON.stringify(packet))}`;
+}
