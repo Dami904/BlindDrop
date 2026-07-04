@@ -15,8 +15,9 @@ const CONFIDENTIAL_DECIMALS = 6;
 
 /** localStorage key for the pre-deploy recipient draft. Never used for anything
  * post-deploy — deployed campaign state, packets, and signatures are authorizations
- * and must never touch storage. */
-const DRAFT_KEY = "blinddrop:create-draft:v1";
+ * and must never touch storage. Exported so the page-level wizard can also restore
+ * it when jumping straight to step 3 (see src/app/create/page.tsx). */
+export const RECIPIENTS_DRAFT_KEY = "blinddrop:create-draft:v1";
 
 interface RecipientsStepProps {
   entries: RecipientEntry[];
@@ -103,7 +104,7 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
     restoredRef.current = true;
     if (hasEntryContent(entries)) return;
     try {
-      const raw = localStorage.getItem(DRAFT_KEY);
+      const raw = localStorage.getItem(RECIPIENTS_DRAFT_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as RecipientEntry[];
       if (!Array.isArray(saved) || !hasEntryContent(saved)) return;
@@ -119,16 +120,16 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
   useEffect(() => {
     const timer = setTimeout(() => {
       if (hasEntryContent(entries)) {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(entries));
+        localStorage.setItem(RECIPIENTS_DRAFT_KEY, JSON.stringify(entries));
       } else {
-        localStorage.removeItem(DRAFT_KEY);
+        localStorage.removeItem(RECIPIENTS_DRAFT_KEY);
       }
     }, 500);
     return () => clearTimeout(timer);
   }, [entries]);
 
   function clearDraft() {
-    localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(RECIPIENTS_DRAFT_KEY);
     onChange([newRecipientEntry()]);
   }
 

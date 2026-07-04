@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useZamaSDK } from "@zama-fhe/react-sdk";
 import { encryptUint64, useSignClaimAuthorization } from "@tokenops/sdk/fhe-airdrop/react";
 import { asEncryptedHandle, createConfidentialAirdropClient } from "@tokenops/sdk/fhe-airdrop";
@@ -10,6 +10,7 @@ import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
+import { clearPackets, loadPackets, savePackets } from "@/lib/create-storage";
 import {
   buildReportCsv,
   buildReportJson,
@@ -130,6 +131,47 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Sealed packets are restored from localStorage (keyed by campaign address)
+  // so an admin who navigates away or reloads lands back on their sealed list
+  // instead of being forced to re-sign every authorization. `sealedAt` is the
+  // stored record's timestamp, shown in the caption below the restored list.
+  const restoredPacketsRef = useRef(false);
+  const [sealedAt, setSealedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (restoredPacketsRef.current) return;
+    restoredPacketsRef.current = true;
+    if (packets.length > 0) return;
+    const stored = loadPackets(deployed.airdrop);
+    if (stored) {
+      setPackets(stored.packets);
+      setSealedAt(stored.sealedAt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deployed.airdrop]);
+
+  // Persist sealed packets, debounced ~400ms — same rationale as the
+  // recipients draft in RecipientsStep. Writes whenever the packet list
+  // settles (new packets sealed, or all cleared).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      savePackets(deployed.airdrop, packets);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [packets, deployed.airdrop]);
+
+  function clearStoredPackets() {
+    const ok = window.confirm(
+      "Clear stored packets? This removes the sealed packets saved in this browser — download the report first if you still need it."
+    );
+    if (!ok) return;
+    clearPackets(deployed.airdrop);
+    setPackets([]);
+    setSealedAt(null);
+    setClaimStatus(new Map());
+    setLastRefreshedAt(null);
+  }
 
   const total = recipients.length;
   const packetsByAddress = new Map(packets.map((p) => [p.address.toLowerCase(), p]));
@@ -485,6 +527,17 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
                 Download all (JSON array)
               </button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+              Sealed packets are stored in this browser so you can return to track claims — clear
+              them once delivered.
+              {sealedAt && <> Last sealed {new Date(sealedAt).toLocaleString()}.</>}
+            </p>
+            <button type="button" onClick={clearStoredPackets} className="link-gold text-xs">
+              Clear stored packets
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-md)] border p-3" style={{ borderColor: "var(--line)" }}>
