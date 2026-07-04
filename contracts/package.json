@@ -1,0 +1,19 @@
+{
+  "name": "@blinddrop/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BlindDropRegistry — a permissionless, public-data-only index of confidential airdrop campaigns created via the TokenOps factory.",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.5.0",
+    "ts-node": "^10.9.2"
+  }
+}
