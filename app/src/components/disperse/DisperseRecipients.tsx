@@ -8,6 +8,7 @@ import {
   type RecipientRowError,
   type ValidatedRecipients,
 } from "@/lib/csv";
+import { AmountsHelper } from "@/components/AmountsHelper";
 
 /** localStorage key for the disperse recipient draft — separate from the
  * create-flow draft key since these are independent flows. Only ever holds
@@ -259,6 +260,12 @@ export function DisperseRecipients({ entries, onChange, validated }: DisperseRec
             </span>
           )}
         </div>
+
+        {entries.length > 0 && (
+          <div className="mt-3">
+            <AmountsHelper entries={entries} onChange={onChange} />
+          </div>
+        )}
 
         {entries.length === 0 && (
           <div

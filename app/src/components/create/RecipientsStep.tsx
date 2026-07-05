@@ -10,6 +10,7 @@ import {
   type RecipientRowError,
 } from "@/lib/csv";
 import { formatConfidentialAmount } from "@/lib/confidential";
+import { AmountsHelper } from "@/components/AmountsHelper";
 
 const CONFIDENTIAL_DECIMALS = 6;
 
@@ -319,6 +320,13 @@ export function RecipientsStep({ entries, onChange, onNext }: RecipientsStepProp
             + Add row
           </button>
         </div>
+
+        {entries.length > 0 && (
+          <div className="mt-3">
+            <AmountsHelper entries={entries} onChange={onChange} />
+          </div>
+        )}
+
         <div className="mt-1 flex items-center justify-between gap-3">
           <PrivacyNote />
           {hasEntryContent(entries) && (

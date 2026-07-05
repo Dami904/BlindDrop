@@ -265,3 +265,34 @@ export function scaleAmountToUnits(amount: string, decimals: number): bigint {
   const combined = `${whole}${fracPadded}`.replace(/^0+(?=\d)/, "");
   return BigInt(combined || "0");
 }
+
+/** Format raw `decimals`-precision token units back to a human decimal string
+ * (trailing zeros trimmed, e.g. `1000000n` at 6 decimals -> `"1"`). */
+function formatUnits(units: bigint, decimals: number): string {
+  const divisor = BigInt(10) ** BigInt(decimals);
+  const whole = units / divisor;
+  const frac = decimals > 0 ? (units % divisor).toString().padStart(decimals, "0").replace(/0+$/, "") : "";
+  return frac ? `${whole.toString()}.${frac}` : whole.toString();
+}
+
+/**
+ * Split `total` evenly across `n` recipients as decimal amount strings, at
+ * {@link MAX_AMOUNT_DECIMALS} precision. Each share is floored to the
+ * 6-decimal cap (raw-unit integer division truncates toward zero); the
+ * remainder left over from that division is added to the **first**
+ * recipient's share, so the shares always sum to exactly `total` rather than
+ * drifting by a few raw units. Returns `[]` when `n <= 0`.
+ *
+ * `total` must already be a valid amount string (validate with
+ * {@link describeAmountError} first) — this does not re-validate it.
+ */
+export function splitEvenly(total: string, n: number): string[] {
+  if (n <= 0) return [];
+  const totalUnits = scaleAmountToUnits(total, MAX_AMOUNT_DECIMALS);
+  const divisor = BigInt(n);
+  const share = totalUnits / divisor;
+  const remainder = totalUnits % divisor;
+  return Array.from({ length: n }, (_, i) =>
+    formatUnits(i === 0 ? share + remainder : share, MAX_AMOUNT_DECIMALS)
+  );
+}

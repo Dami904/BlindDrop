@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useZamaSDK } from "@zama-fhe/react-sdk";
 import { encryptUint64, useSignClaimAuthorization } from "@tokenops/sdk/fhe-airdrop/react";
 import { asEncryptedHandle, createConfidentialAirdropClient } from "@tokenops/sdk/fhe-airdrop";
-import { usePublicClient } from "wagmi";
+import { usePublicClient, useAccount } from "wagmi";
 import type { Address, Hex } from "viem";
 import { SEPOLIA_CHAIN_ID, buildClaimLink, type ClaimPacket } from "@/lib/packet";
 import { scaleAmountToUnits, type RecipientRow } from "@/lib/csv";
 import { toTokenOpsEncryptor } from "@/lib/encryptor";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
+import { CampaignControls } from "@/components/create/CampaignControls";
 import {
   clearPackets,
   loadCampaignNames,
@@ -119,6 +120,9 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
   const zamaSDK = useZamaSDK();
   const sign = useSignClaimAuthorization();
   const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID });
+  const { address: connectedAddress } = useAccount();
+  const isAdmin =
+    !!connectedAddress && connectedAddress.toLowerCase() === deployed.admin.toLowerCase();
 
   const [packets, setPackets] = useState<GeneratedPacket[]>([]);
   const [stage, setStage] = useState<"encrypting" | "signing" | null>(null);
@@ -499,6 +503,8 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
         </p>
       </div>
 
+      {isAdmin && <CampaignControls deployed={deployed} />}
+
       {packets.length === 0 && !isRunning && (
         <button
           type="button"
@@ -593,6 +599,10 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
               Clear stored packets
             </button>
           </div>
+          <p className="text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            A recipient lost their link? Copy it again from their row — or re-seal just that
+            recipient; old and new packets can&apos;t double-claim.
+          </p>
 
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--r-md)] border p-3" style={{ borderColor: "var(--line)" }}>
             <div className="text-xs" style={{ color: "var(--text-dim)" }}>

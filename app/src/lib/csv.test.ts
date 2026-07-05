@@ -5,6 +5,7 @@ import {
   describeAmountError,
   validateRecipientEntries,
   scaleAmountToUnits,
+  splitEvenly,
   type RecipientEntry,
 } from "./csv";
 
@@ -295,5 +296,37 @@ describe("header with email column but email-less rows", () => {
     const result = parseRecipientsCsv(raw);
     expect(result.errors).toEqual([]);
     expect(result.rows[0].email).toBe("someone@example.com");
+  });
+});
+
+describe("splitEvenly", () => {
+  it("splits an evenly-divisible total with no remainder", () => {
+    expect(splitEvenly("30", 3)).toEqual(["10", "10", "10"]);
+  });
+
+  it("gives the first recipient the rounding remainder", () => {
+    // 10 / 3 = 3.333333... floored to 6dp per share = 3.333333, three shares
+    // sum to 9.999999 raw units short of 10 by 1 raw unit (0.000001) — that
+    // goes to the first recipient.
+    const shares = splitEvenly("10", 3);
+    expect(shares).toEqual(["3.333334", "3.333333", "3.333333"]);
+  });
+
+  it("shares sum to exactly the total, respecting the 6-decimal cap", () => {
+    const total = "100.123456";
+    const n = 7;
+    const shares = splitEvenly(total, n);
+    const sum = shares.reduce((acc, s) => acc + scaleAmountToUnits(s, 6), BigInt(0));
+    expect(sum).toBe(scaleAmountToUnits(total, 6));
+    expect(shares).toHaveLength(n);
+  });
+
+  it("handles a single recipient (gets the whole total)", () => {
+    expect(splitEvenly("42.5", 1)).toEqual(["42.5"]);
+  });
+
+  it("returns an empty array for n <= 0", () => {
+    expect(splitEvenly("10", 0)).toEqual([]);
+    expect(splitEvenly("10", -1)).toEqual([]);
   });
 });
