@@ -34,9 +34,13 @@ export function ConnectButton() {
     <button
       onClick={() => injectedConnector && connect({ connector: injectedConnector })}
       disabled={isPending || !injectedConnector}
-      className="btn btn-seal"
+      className="btn btn-seal whitespace-nowrap"
     >
-      {isPending ? "Connecting…" : "Connect Wallet"}
+      {isPending ? "Connecting…" : (
+        <>
+          Connect<span className="hidden min-[340px]:inline">&nbsp;Wallet</span>
+        </>
+      )}
     </button>
   );
 }
