@@ -230,7 +230,6 @@ export interface AutoSendPanelProps {
  */
 export function AutoSendPanel({ recipients, auto }: AutoSendPanelProps) {
   const [open, setOpen] = useState(false);
-  const [ownAccountOpen, setOwnAccountOpen] = useState(false);
   const total = recipients.length;
 
   const configFields = (
@@ -312,26 +311,10 @@ export function AutoSendPanel({ recipients, auto }: AutoSendPanelProps) {
       >
         <div className="flex flex-col gap-4 px-4 pb-4">
           {auto.envConfigured ? (
-            <>
-              <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-                Emails send from your browser via the app&apos;s shared EmailJS quota.
-              </p>
-              <div className="rounded-[var(--r-md)] border" style={{ borderColor: "var(--line)" }}>
-                <Collapsible
-                  open={ownAccountOpen}
-                  onOpenChange={setOwnAccountOpen}
-                  triggerClassName="flex w-full items-center justify-between gap-3 p-3 text-left text-xs"
-                  trigger={
-                    <>
-                      <span style={{ color: "var(--text-dim)" }}>Use your own EmailJS account instead</span>
-                      <ChevronIcon open={ownAccountOpen} />
-                    </>
-                  }
-                >
-                  <div className="flex flex-col gap-4 p-3 pt-0">{configFields}</div>
-                </Collapsible>
-              </div>
-            </>
+            <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+              Toggle on and send — each recipient gets their claim link by email, straight from your
+              browser. No list ever touches a server.
+            </p>
           ) : (
             configFields
           )}
