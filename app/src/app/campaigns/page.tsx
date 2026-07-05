@@ -19,7 +19,7 @@ export default function CampaignsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-16">
       <p className="eyebrow">Case files · the archive</p>
-      <h1 className="font-display mt-2 text-3xl">Your distributions</h1>
+      <h1 className="font-display mt-2 text-3xl sm:text-4xl">Your distributions</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Every campaign you saved on-chain and every push-send you logged — search the archive,
         sort it, and manage a campaign&apos;s pause, resume and sweep from one desk.

@@ -379,7 +379,7 @@ export default function DispersePage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
       <p className="eyebrow">One-shot distribution</p>
-      <h1 className="font-display mt-2 text-3xl">Disperse Tokens</h1>
+      <h1 className="font-display mt-2 text-3xl sm:text-4xl">Disperse Tokens</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Batch-send encrypted token amounts to many recipients in a single confidential
         transaction — no campaign or claim step required.

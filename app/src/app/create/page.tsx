@@ -82,7 +82,7 @@ export default function CreatePage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
       <p className="eyebrow">Case file · new distribution</p>
-      <h1 className="font-display mt-2 text-3xl">Create Distribution</h1>
+      <h1 className="font-display mt-2 text-3xl sm:text-4xl">Create Distribution</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>

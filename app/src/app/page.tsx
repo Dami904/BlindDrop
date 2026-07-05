@@ -49,7 +49,7 @@ export default function Home() {
           Zama FHEVM · TokenOps SDK · Sepolia
         </div>
 
-        <h1 className="font-display mt-6 max-w-3xl text-4xl leading-tight sm:text-6xl">
+        <h1 className="font-display mt-6 max-w-3xl text-4xl leading-tight sm:text-7xl">
           <HeroDecode text="Every allocation," />
           <br />
           <span style={{ color: "var(--gold)" }}>

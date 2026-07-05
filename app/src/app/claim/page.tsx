@@ -49,7 +49,7 @@ function ClaimContent() {
   return (
     <div className="mx-auto flex max-w-3xl flex-1 flex-col px-6 py-16">
       <p className="eyebrow">Recipient intake</p>
-      <h1 className="font-display mt-2 text-3xl">Claim Tokens</h1>
+      <h1 className="font-display mt-2 text-3xl sm:text-4xl">Claim Tokens</h1>
       <p className="mt-3" style={{ color: "var(--text-dim)" }}>
         Open the claim packet your campaign admin sent you, then submit it from the wallet it was
         issued to — only you can see the amount inside.
