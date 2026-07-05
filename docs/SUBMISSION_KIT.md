@@ -36,6 +36,10 @@ Film: screen recording of the live app + your webcam/voice. Rehearse once; keep 
   is a ciphertext handle."
 
 **[2:20–2:45] Breadth (fast cuts)**
+- Selective disclosure (on the claim page): "need your accountant to see it? Grant exactly them —
+  with an expiry, revocable anytime. Other approaches bake an auditor into the contract; here,
+  disclosure belongs to the person whose money it is. Enforced by the FHE access-control layer,
+  not by us."
 - Disperse: "the push model — payroll for any list size in one transaction, nothing to claim."
 - Campaign cards: "my campaigns, indexed by our own on-chain registry contract — and where other
   apps print totals and recipient counts, ours shows sealed bars, because that data isn't on-chain

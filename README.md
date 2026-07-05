@@ -29,7 +29,10 @@ distribution admin.
    screen, and download a full campaign report (CSV/JSON).
 4. **Claim & Verify** — as a recipient, open your claim link (packet pre-loaded), **reveal your
    exact allocation** before or after claiming, claim, then decrypt your balance — all reveals
-   happen in your browser via Zama's EIP-712 user decryption.
+   happen in your browser via Zama's EIP-712 user decryption. And with **selective disclosure**,
+   grant anyone you choose (an accountant, an auditor) the right to decrypt your amounts —
+   token-scoped, optionally expiring, revocable anytime, enforced by the FHE access-control layer
+   rather than by this app.
 5. **Disperse** — the push model: pay any list in **one transaction**, no claiming, no packets —
    for payroll and investor payouts at scale.
 

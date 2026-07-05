@@ -4,6 +4,7 @@ import { Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ClaimPanel } from "@/components/ClaimPanel";
 import { VerifyPanel } from "@/components/VerifyPanel";
+import { DisclosurePanel } from "@/components/DisclosurePanel";
 import { Stepper, type StepDef } from "@/components/Stepper";
 import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 
@@ -93,6 +94,8 @@ function ClaimContent() {
           </div>
         </Collapsible>
       </div>
+
+      <DisclosurePanel initialToken={verifyToken} />
     </div>
   );
 }
