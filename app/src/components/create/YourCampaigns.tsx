@@ -2,13 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
-import { isAddress, zeroAddress, type Address } from "viem";
+import { isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { useMetadata } from "@zama-fhe/react-sdk";
 import { confidentialAirdropCloneableAbi } from "@tokenops/sdk/fhe-airdrop";
 import { etherscanAddressUrl } from "@/lib/packet";
 import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
 import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 import { loadCampaignNames, saveCampaignName } from "@/lib/create-storage";
+import { CampaignControls } from "@/components/create/CampaignControls";
+import type { DeployedCampaign } from "@/components/create/CampaignStep";
+
+/** OpenZeppelin AccessControl's `DEFAULT_ADMIN_ROLE` is `bytes32(0)`. The
+ * airdrop clone gates pause/sweep on `hasRole(DEFAULT_ADMIN_ROLE, caller)`,
+ * so an address is the campaign's admin iff that read returns true. Using
+ * the well-known constant avoids a second, sequential `DEFAULT_ADMIN_ROLE()`
+ * read (which couldn't share the same batched multicall). */
+const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -33,6 +42,10 @@ interface CampaignMeta {
   settled: boolean;
   /** True if any of the four reads for this campaign reverted/errored. */
   failed: boolean;
+  /** True when the connected wallet holds this campaign's DEFAULT_ADMIN_ROLE —
+   * gates the per-card "Manage" (pause/sweep) section. False when not
+   * connected or the admin read failed. */
+  isAdmin: boolean;
 }
 
 /** The four view calls read per campaign, batched into a single multicall. */
@@ -128,13 +141,34 @@ export function YourCampaigns() {
 
   const list = campaigns ?? [];
 
-  const contracts = list.flatMap((campaign) =>
-    CAMPAIGN_VIEWS.map((functionName) => ({
+  // Per campaign: the four public status views, plus (when a wallet is
+  // connected) a `hasRole(DEFAULT_ADMIN_ROLE, wallet)` read so each card can
+  // decide whether to offer admin controls — all in the one batched multicall,
+  // never N extra hooks. The admin read is appended only while connected, so
+  // the stride grows by one and the metas mapping below reads from that offset.
+  const readsPerCampaign = address ? CAMPAIGN_VIEWS.length + 1 : CAMPAIGN_VIEWS.length;
+
+  const contracts = list.flatMap((campaign) => {
+    const reads: {
+      address: Address;
+      abi: typeof confidentialAirdropCloneableAbi;
+      functionName: string;
+      args?: readonly unknown[];
+    }[] = CAMPAIGN_VIEWS.map((functionName) => ({
       address: campaign,
       abi: confidentialAirdropCloneableAbi,
       functionName,
-    })),
-  );
+    }));
+    if (address) {
+      reads.push({
+        address: campaign,
+        abi: confidentialAirdropCloneableAbi,
+        functionName: "hasRole",
+        args: [DEFAULT_ADMIN_ROLE, address],
+      });
+    }
+    return reads;
+  });
 
   const { data: results, isLoading: metaLoading } = useReadContracts({
     contracts,
@@ -144,17 +178,22 @@ export function YourCampaigns() {
   if (!isConnected) return null;
 
   const metas: CampaignMeta[] = list.map((_, index) => {
-    const base = index * CAMPAIGN_VIEWS.length;
+    const base = index * readsPerCampaign;
     const slice = results?.slice(base, base + CAMPAIGN_VIEWS.length);
     if (!slice || slice.length < CAMPAIGN_VIEWS.length) {
-      return { settled: false, failed: false };
+      return { settled: false, failed: false, isAdmin: false };
     }
     const [startTimeRes, endTimeRes, pausedRes, tokenRes] = slice;
     const failed = slice.some((entry) => entry.status !== "success");
-    if (failed) return { settled: true, failed: true };
+    if (failed) return { settled: true, failed: true, isAdmin: false };
+    // The admin read sits right after the four views (only present while a
+    // wallet is connected). A revert/absent result means "not admin".
+    const adminRes = address ? results?.[base + CAMPAIGN_VIEWS.length] : undefined;
+    const isAdmin = adminRes?.status === "success" && adminRes.result === true;
     return {
       settled: true,
       failed: false,
+      isAdmin,
       startTime: startTimeRes.result as unknown as bigint,
       endTime: endTimeRes.result as unknown as bigint,
       paused: pausedRes.result as unknown as boolean,
@@ -196,6 +235,7 @@ export function YourCampaigns() {
                 campaign={campaign}
                 meta={metas[index]}
                 loading={metaLoading || !metas[index].settled}
+                connectedAddress={address}
                 name={names[campaign.toLowerCase()]}
                 onRename={(name) => handleRename(campaign, name)}
               />
@@ -216,18 +256,31 @@ function CampaignCard({
   campaign,
   meta,
   loading,
+  connectedAddress,
   name,
   onRename,
 }: {
   campaign: string;
   meta: CampaignMeta;
   loading: boolean;
+  connectedAddress?: Address;
   name?: string;
   onRename: (name: string) => void;
 }) {
   const status = campaignStatus(meta);
   const style = STATUS_STYLE[status];
   const hasToken = !loading && !meta.failed && meta.token && isAddress(meta.token) && meta.token !== zeroAddress;
+
+  // Admin controls mount only when the connected wallet actually holds this
+  // campaign's DEFAULT_ADMIN_ROLE (verified on-chain via the batched hasRole
+  // read) and the card address is valid — otherwise the card stays view-only.
+  const canManage =
+    !loading &&
+    !meta.failed &&
+    meta.isAdmin &&
+    !!connectedAddress &&
+    isAddress(campaign) &&
+    meta.endTime !== undefined;
 
   return (
     <div
@@ -297,8 +350,43 @@ function CampaignCard({
           <span>sealed</span>
         </span>
       </div>
+
+      {canManage && connectedAddress && (
+        <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--line)" }}>
+          <CampaignControls deployed={buildManagedCampaign(campaign, meta, connectedAddress)} />
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * Builds the minimal {@link DeployedCampaign}-shaped object CampaignControls
+ * needs to manage a campaign discovered from the registry (rather than one
+ * just deployed in-session). CampaignControls only ever reads `airdrop` (for
+ * its pause/withdraw hooks) and `endTimestamp` (for the "claim window ended"
+ * copy + the early-sweep confirm) — the withdraw recipient and admin guard
+ * both come from `useAccount()` inside the component, and the mutations are
+ * admin-gated on-chain regardless. The remaining fields are never consumed
+ * here, so they carry safe placeholders; `token`/`admin`/timestamps still get
+ * real values from the card's own reads to keep the object honest.
+ */
+function buildManagedCampaign(
+  airdrop: Address,
+  meta: CampaignMeta,
+  connectedAddress: Address,
+): DeployedCampaign {
+  return {
+    airdrop,
+    token: (meta.token ?? zeroAddress) as Address,
+    admin: connectedAddress,
+    endTimestamp: meta.endTime !== undefined ? Number(meta.endTime) : 0,
+    startTimestamp: meta.startTime !== undefined ? Number(meta.startTime) : 0,
+    // Placeholders — never read by CampaignControls (deploy/fund-only fields).
+    hash: "0x" as Hex,
+    userSalt: "0x" as Hex,
+    gasFee: BigInt(0),
+  };
 }
 
 const CAMPAIGN_NAME_MAX_LENGTH = 40;

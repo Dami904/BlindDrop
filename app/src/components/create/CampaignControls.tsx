@@ -97,22 +97,31 @@ export function CampaignControls({ deployed }: CampaignControlsProps) {
                 Paused campaigns reject all claims until resumed.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void togglePaused()}
-              disabled={isPaused.isLoading || setPaused.isPending}
-              className="btn btn-gold shrink-0 text-xs"
-            >
-              {setPaused.isPending
-                ? isPaused.data
-                  ? "Resuming…"
-                  : "Pausing…"
-                : isPaused.data
-                  ? "Resume claims"
-                  : "Pause claims"}
-            </button>
+            {/* Once swept in-session the pool is empty, so pausing/resuming is
+                moot — replace the control with a quiet note rather than offer a
+                no-op action. The un-swept flow is untouched. */}
+            {withdrawTx ? (
+              <p className="shrink-0 text-xs" style={{ color: "var(--text-faint)" }}>
+                Pool swept — nothing left to claim or pause.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void togglePaused()}
+                disabled={isPaused.isLoading || setPaused.isPending}
+                className="btn btn-gold shrink-0 text-xs"
+              >
+                {setPaused.isPending
+                  ? isPaused.data
+                    ? "Resuming…"
+                    : "Pausing…"
+                  : isPaused.data
+                    ? "Resume claims"
+                    : "Pause claims"}
+              </button>
+            )}
           </div>
-          <TxStatusLine awaitingWallet={setPaused.isPending} className="mt-2" />
+          {!withdrawTx && <TxStatusLine awaitingWallet={setPaused.isPending} className="mt-2" />}
           {pauseError && (
             <ErrorNote className="mt-2" message={pauseError.message} detail={pauseError.detail} />
           )}
