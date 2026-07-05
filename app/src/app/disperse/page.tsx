@@ -34,20 +34,9 @@ import { InfoTip } from "@/components/InfoTip";
 import { ErrorNote } from "@/components/ErrorNote";
 import { describeMutationError, type FriendlyError } from "@/lib/errors";
 import { SealStamp } from "@/components/SealStamp";
+import { saveDisperseReceipt, type DisperseReceipt } from "@/lib/disperse-history";
 
 const CONFIDENTIAL_DECIMALS = 6;
-
-interface DisperseReceipt {
-  token: { address: string; name?: string; symbol?: string };
-  recipientCount: number;
-  totalAmountHuman: string;
-  totalAmountRawUnits: string;
-  txHash: string;
-  etherscanUrl: string;
-  /** ISO timestamp of when the disperse transaction was submitted. */
-  timestamp: string;
-  note: string;
-}
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -633,7 +622,7 @@ export default function DispersePage() {
                   {
                     onSuccess: (data) => {
                       invalidateDisperseQueries();
-                      setReceipt({
+                      const built: DisperseReceipt = {
                         token: { address: token, name: tokenMetadata.data?.name, symbol },
                         recipientCount: recipients.length,
                         totalAmountHuman: formatConfidentialAmount(totalAmountUnits, decimals),
@@ -643,7 +632,11 @@ export default function DispersePage() {
                         timestamp: new Date().toISOString(),
                         note:
                           "Amounts in this receipt are your local record only — on-chain, transfer amounts remain FHE-encrypted.",
-                      });
+                      };
+                      setReceipt(built);
+                      // Also log to the sender's local disperse history so it
+                      // shows on the Campaigns page after a reload/navigation.
+                      saveDisperseReceipt(built);
                     },
                   }
                 );

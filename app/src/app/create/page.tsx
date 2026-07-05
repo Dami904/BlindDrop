@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Hex } from "viem";
 import { RecipientsStep, RECIPIENTS_DRAFT_KEY } from "@/components/create/RecipientsStep";
 import { CampaignStep, type DeployedCampaign } from "@/components/create/CampaignStep";
 import { ClaimPacketsStep } from "@/components/create/ClaimPacketsStep";
-import { YourCampaigns } from "@/components/create/YourCampaigns";
 import { newRecipientEntry, validateRecipientEntries, type RecipientEntry } from "@/lib/csv";
 import {
   clearDeployedCampaign,
@@ -87,11 +87,7 @@ export default function CreatePage() {
         Set up a new confidential token distribution with FHE-encrypted amounts per recipient.
       </p>
 
-      <div className="mt-8">
-        <YourCampaigns />
-      </div>
-
-      <ol className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+      <ol className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         {STEPS.map((s, i) => {
           const state = step === s.id ? "active" : s.id < step ? "done" : undefined;
           const reachable =
@@ -121,7 +117,10 @@ export default function CreatePage() {
       </ol>
 
       {deployed && (
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+          <Link href="/campaigns" className="link-gold text-xs">
+            Manage your campaigns →
+          </Link>
           <button type="button" onClick={startNewCampaign} className="link-gold text-xs">
             Start a new campaign
           </button>

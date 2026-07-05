@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { useMetadata } from "@zama-fhe/react-sdk";
 import { confidentialAirdropCloneableAbi } from "@tokenops/sdk/fhe-airdrop";
 import { etherscanAddressUrl } from "@/lib/packet";
 import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
-import { Collapsible, ChevronIcon } from "@/components/Collapsible";
 import { loadCampaignNames, saveCampaignName } from "@/lib/create-storage";
 import { CampaignControls } from "@/components/create/CampaignControls";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
+import type { CampaignSort } from "@/components/campaigns/toolbar";
 
 /** OpenZeppelin AccessControl's `DEFAULT_ADMIN_ROLE` is `bytes32(0)`. The
  * airdrop clone gates pause/sweep on `hasRole(DEFAULT_ADMIN_ROLE, caller)`,
- * so an address is the campaign's admin iff that read returns true. Using
- * the well-known constant avoids a second, sequential `DEFAULT_ADMIN_ROLE()`
- * read (which couldn't share the same batched multicall). */
+ * so an address is the campaign's admin iff that read returns true. Using the
+ * well-known constant lets the admin check share the same batched multicall. */
 const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 
 function shortAddress(address: string) {
@@ -43,12 +42,10 @@ interface CampaignMeta {
   /** True if any of the four reads for this campaign reverted/errored. */
   failed: boolean;
   /** True when the connected wallet holds this campaign's DEFAULT_ADMIN_ROLE —
-   * gates the per-card "Manage" (pause/sweep) section. False when not
-   * connected or the admin read failed. */
+   * gates the per-card "Manage" (pause/sweep) section. */
   isAdmin: boolean;
 }
 
-/** The four view calls read per campaign, batched into a single multicall. */
 const CAMPAIGN_VIEWS = ["START_TIME", "endTime", "isPaused", "TOKEN"] as const;
 
 const STATUS_STYLE: Record<Status, { label: string; border: string; bg: string; color: string }> = {
@@ -58,6 +55,9 @@ const STATUS_STYLE: Record<Status, { label: string; border: string; bg: string; 
   PAUSED: { label: "PAUSED", border: "var(--warn)", bg: "var(--warn-dim)", color: "var(--callout-warn-text)" },
   UNKNOWN: { label: "UNKNOWN", border: "var(--line-strong)", bg: "transparent", color: "var(--text-faint)" },
 };
+
+/** Sort priority for the "Status" sort — active/soon-open campaigns bubble up. */
+const STATUS_ORDER: Record<Status, number> = { LIVE: 0, UPCOMING: 1, PAUSED: 2, CLOSED: 3, UNKNOWN: 4 };
 
 function campaignStatus(meta: CampaignMeta): Status {
   if (!meta.settled || meta.failed || meta.startTime === undefined || meta.endTime === undefined || meta.paused === undefined) {
@@ -70,9 +70,15 @@ function campaignStatus(meta: CampaignMeta): Status {
   return "LIVE";
 }
 
-/** Sealed-envelope glyph for empty ledger/case-file states — reuses the
- * envelope + wax-seal motif rather than an image, kept deliberately quiet
- * (text-faint) since it marks an absence, not an action. */
+function claimWindowLabel(meta: CampaignMeta, status: Status) {
+  if (status === "UNKNOWN") return "Claim window unknown";
+  if (status === "UPCOMING" && meta.startTime !== undefined) return `Opens ${formatCompactDate(meta.startTime)}`;
+  if (status === "CLOSED" && meta.endTime !== undefined) return `Closed ${formatCompactDate(meta.endTime)}`;
+  if (meta.endTime !== undefined) return `Closes ${formatCompactDate(meta.endTime)}`;
+  return "Claim window unknown";
+}
+
+/** Sealed-envelope glyph for empty case-file states. */
 function EmptyLedgerGlyph() {
   return (
     <svg width="30" height="22" viewBox="0 0 30 22" fill="none" aria-hidden>
@@ -83,40 +89,71 @@ function EmptyLedgerGlyph() {
   );
 }
 
-function claimWindowLabel(meta: CampaignMeta, status: Status) {
-  if (status === "UNKNOWN") return "Claim window unknown";
-  if (status === "UPCOMING" && meta.startTime !== undefined) return `Opens ${formatCompactDate(meta.startTime)}`;
-  if (status === "CLOSED" && meta.endTime !== undefined) return `Closed ${formatCompactDate(meta.endTime)}`;
-  if (meta.endTime !== undefined) return `Closes ${formatCompactDate(meta.endTime)}`;
-  return "Claim window unknown";
+interface CampaignItem {
+  campaign: Address;
+  meta: CampaignMeta;
+  name?: string;
+  symbol?: string;
+  /** Registry append-index — used as the chronological proxy for newest/oldest sort. */
+  index: number;
+}
+
+function matchesQuery(item: CampaignItem, q: string): boolean {
+  if (!q) return true;
+  const haystack = [
+    item.name ?? "",
+    item.campaign,
+    item.symbol ?? "",
+    item.meta.token ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(q);
+}
+
+function sortItems(items: CampaignItem[], sort: CampaignSort): CampaignItem[] {
+  const copy = [...items];
+  if (sort === "status") {
+    copy.sort((a, b) => {
+      const diff = STATUS_ORDER[campaignStatus(a.meta)] - STATUS_ORDER[campaignStatus(b.meta)];
+      return diff !== 0 ? diff : b.index - a.index;
+    });
+  } else if (sort === "oldest") {
+    copy.sort((a, b) => a.index - b.index);
+  } else {
+    copy.sort((a, b) => b.index - a.index);
+  }
+  return copy;
 }
 
 /**
- * "Your campaigns" panel — reads `campaignsOf(address)` from the opt-in
- * BlindDropRegistry so an admin can find campaigns they saved after a page
- * reload, then reads each campaign contract's own public getters (start/end
- * time, pause state, token) to render an informative status card. Purely
- * read-only/public data: the registry and these getters are never consulted
- * for claim/fund authorization, so this list is informational only.
- *
- * Token + claim-window metadata come straight from each airdrop clone's own
- * `TOKEN()`/`START_TIME()`/`endTime()`/`isPaused()` views rather than from
- * the registry's `campaignAt`/`campaignsSlice` — those two enumerate the
- * *entire* registry by global index (not filtered by registrar), so turning
- * a registrar's `campaignsOf` list into records would mean an unbounded scan
- * and an address-match per entry. Reading each campaign contract directly is
- * one batched multicall, no scan required.
+ * "Airdrop campaigns" management dashboard — reads `campaignsOf(address)` from
+ * the opt-in BlindDropRegistry so an admin can find campaigns they saved after
+ * a reload, then reads each campaign contract's own public getters
+ * (start/end time, pause state, token) plus a `hasRole` admin check in one
+ * batched multicall. Purely read-only/public data — never consulted for
+ * claim/fund authorization. Filterable/sortable via the shared toolbar.
  */
-export function YourCampaigns() {
+export function AirdropCampaigns({ query, sort }: { query: string; sort: CampaignSort }) {
   const { address, isConnected } = useAccount();
 
-  // Local-only nicknames, keyed by lowercased campaign address — loaded once
-  // on mount and kept in state so renames re-render immediately without a
-  // re-read from localStorage on every card.
+  // Local-only nicknames, keyed by lowercased campaign address.
   const [names, setNames] = useState<Record<string, string>>({});
+  // Resolved token symbols, keyed by lowercased campaign address — populated
+  // by always-mounted resolvers below so token-symbol search works even for
+  // campaigns currently filtered out of view.
+  const [symbols, setSymbols] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setNames(loadCampaignNames());
+  }, []);
+
+  const handleSymbolResolved = useCallback((campaign: string, symbol: string) => {
+    setSymbols((prev) => {
+      const key = campaign.toLowerCase();
+      if (prev[key] === symbol) return prev;
+      return { ...prev, [key]: symbol };
+    });
   }, []);
 
   function handleRename(campaign: string, name: string) {
@@ -141,11 +178,6 @@ export function YourCampaigns() {
 
   const list = campaigns ?? [];
 
-  // Per campaign: the four public status views, plus (when a wallet is
-  // connected) a `hasRole(DEFAULT_ADMIN_ROLE, wallet)` read so each card can
-  // decide whether to offer admin controls — all in the one batched multicall,
-  // never N extra hooks. The admin read is appended only while connected, so
-  // the stride grows by one and the metas mapping below reads from that offset.
   const readsPerCampaign = address ? CAMPAIGN_VIEWS.length + 1 : CAMPAIGN_VIEWS.length;
 
   const contracts = list.flatMap((campaign) => {
@@ -186,8 +218,6 @@ export function YourCampaigns() {
     const [startTimeRes, endTimeRes, pausedRes, tokenRes] = slice;
     const failed = slice.some((entry) => entry.status !== "success");
     if (failed) return { settled: true, failed: true, isAdmin: false };
-    // The admin read sits right after the four views (only present while a
-    // wallet is connected). A revert/absent result means "not admin".
     const adminRes = address ? results?.[base + CAMPAIGN_VIEWS.length] : undefined;
     const isAdmin = adminRes?.status === "success" && adminRes.result === true;
     return {
@@ -201,54 +231,84 @@ export function YourCampaigns() {
     };
   });
 
+  const items: CampaignItem[] = list.map((campaign, index) => ({
+    campaign,
+    meta: metas[index],
+    name: names[campaign.toLowerCase()],
+    symbol: symbols[campaign.toLowerCase()],
+    index,
+  }));
+
+  const q = query.trim().toLowerCase();
+  const visible = sortItems(items.filter((item) => matchesQuery(item, q)), sort);
+
+  // Token addresses worth resolving a symbol for — mounted unconditionally
+  // (independent of the filter) so symbol search can match hidden campaigns.
+  const tokenResolvers = items.filter(
+    (item) => item.meta.token && isAddress(item.meta.token) && item.meta.token !== zeroAddress
+  );
+
   return (
-    <div className="panel mb-8 p-4">
-      <Collapsible
-        defaultOpen={list.length > 0}
-        triggerClassName="flex w-full items-center justify-between gap-4 text-left"
-        trigger={
-          <>
-            <span>
-              <h3 className="eyebrow">Campaigns you&apos;ve saved on-chain</h3>
-              <p className="mt-1 text-xs" style={{ color: "var(--text-faint)" }}>
-                {isLoading
-                  ? "Checking the registry…"
-                  : `${list.length} saved campaign${list.length === 1 ? "" : "s"}`}
-              </p>
-            </span>
-            <ChevronIcon open={list.length > 0} />
-          </>
-        }
-      >
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {list.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-4 text-center sm:col-span-2">
-              <EmptyLedgerGlyph />
-              <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-                No case files yet — deploy a campaign and save it here.
-              </p>
-            </div>
-          ) : (
-            list.map((campaign, index) => (
-              <CampaignCard
-                key={campaign}
-                campaign={campaign}
-                meta={metas[index]}
-                loading={metaLoading || !metas[index].settled}
-                connectedAddress={address}
-                name={names[campaign.toLowerCase()]}
-                onRename={(name) => handleRename(campaign, name)}
-              />
-            ))
-          )}
-        </div>
-        {list.length > 0 && (
-          <p className="mt-3 text-xs" style={{ color: "var(--text-faint)" }}>
-            Names are saved only in this browser — never on-chain.
-          </p>
+    <section className="panel p-4 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-xl">Airdrop campaigns</h2>
+        <p className="text-xs" style={{ color: "var(--text-faint)" }}>
+          {isLoading
+            ? "Checking the registry…"
+            : `${list.length} saved${list.length ? ` · ${visible.length} shown` : ""}`}
+        </p>
+      </div>
+      <p className="mt-1 text-sm" style={{ color: "var(--text-dim)" }}>
+        Campaigns you saved on-chain — manage pause, resume and sweep here.
+      </p>
+
+      {/* Off-screen symbol resolvers — render nothing, just report symbols up. */}
+      <div className="sr-only" aria-hidden>
+        {tokenResolvers.map((item) => (
+          <TokenSymbolResolver
+            key={item.campaign}
+            campaign={item.campaign}
+            token={item.meta.token as Address}
+            onResolved={handleSymbolResolved}
+          />
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {list.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <EmptyLedgerGlyph />
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              No campaigns saved yet — deploy one, save it to your campaigns, and manage it here.
+            </p>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <EmptyLedgerGlyph />
+            <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+              No campaigns match your search.
+            </p>
+          </div>
+        ) : (
+          visible.map((item) => (
+            <CampaignCard
+              key={item.campaign}
+              campaign={item.campaign}
+              meta={item.meta}
+              loading={metaLoading || !item.meta.settled}
+              connectedAddress={address}
+              name={item.name}
+              onRename={(name) => handleRename(item.campaign, name)}
+            />
+          ))
         )}
-      </Collapsible>
-    </div>
+      </div>
+      {list.length > 0 && (
+        <p className="mt-3 text-xs" style={{ color: "var(--text-faint)" }}>
+          Names are saved only in this browser — never on-chain.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -271,9 +331,6 @@ function CampaignCard({
   const style = STATUS_STYLE[status];
   const hasToken = !loading && !meta.failed && meta.token && isAddress(meta.token) && meta.token !== zeroAddress;
 
-  // Admin controls mount only when the connected wallet actually holds this
-  // campaign's DEFAULT_ADMIN_ROLE (verified on-chain via the batched hasRole
-  // read) and the card address is valid — otherwise the card stays view-only.
   const canManage =
     !loading &&
     !meta.failed &&
@@ -284,7 +341,7 @@ function CampaignCard({
 
   return (
     <div
-      className="flex min-w-0 flex-col gap-2 rounded-md border p-3"
+      className="flex min-w-0 flex-col gap-2 rounded-md border p-3 sm:p-4"
       style={{ borderColor: "var(--line)", background: "var(--ink-3)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -303,7 +360,7 @@ function CampaignCard({
             href={etherscanAddressUrl(campaign)}
             target="_blank"
             rel="noreferrer"
-            className="link-gold font-data text-xs"
+            className="link-gold font-data text-xs break-all"
           >
             {shortAddress(campaign)}
           </a>
@@ -353,7 +410,7 @@ function CampaignCard({
 
       {canManage && connectedAddress && (
         <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--line)" }}>
-          <CampaignControls deployed={buildManagedCampaign(campaign, meta, connectedAddress)} />
+          <CampaignControls deployed={buildManagedCampaign(campaign as Address, meta, connectedAddress)} />
         </div>
       )}
     </div>
@@ -362,14 +419,11 @@ function CampaignCard({
 
 /**
  * Builds the minimal {@link DeployedCampaign}-shaped object CampaignControls
- * needs to manage a campaign discovered from the registry (rather than one
- * just deployed in-session). CampaignControls only ever reads `airdrop` (for
- * its pause/withdraw hooks) and `endTimestamp` (for the "claim window ended"
- * copy + the early-sweep confirm) — the withdraw recipient and admin guard
- * both come from `useAccount()` inside the component, and the mutations are
- * admin-gated on-chain regardless. The remaining fields are never consumed
- * here, so they carry safe placeholders; `token`/`admin`/timestamps still get
- * real values from the card's own reads to keep the object honest.
+ * needs to manage a registry-discovered campaign. CampaignControls only reads
+ * `airdrop` (its pause/withdraw hooks) and `endTimestamp` (the "claim window
+ * ended" copy + early-sweep confirm); the withdraw recipient and admin guard
+ * come from `useAccount()` inside it, and the mutations are admin-gated
+ * on-chain regardless. The rest carry safe placeholders.
  */
 function buildManagedCampaign(
   airdrop: Address,
@@ -382,7 +436,6 @@ function buildManagedCampaign(
     admin: connectedAddress,
     endTimestamp: meta.endTime !== undefined ? Number(meta.endTime) : 0,
     startTimestamp: meta.startTime !== undefined ? Number(meta.startTime) : 0,
-    // Placeholders — never read by CampaignControls (deploy/fund-only fields).
     hash: "0x" as Hex,
     userSalt: "0x" as Hex,
     gasFee: BigInt(0),
@@ -392,12 +445,10 @@ function buildManagedCampaign(
 const CAMPAIGN_NAME_MAX_LENGTH = 40;
 
 /**
- * Local-only nickname for a campaign card: shows the name as the card's
- * title (with the address demoted to a secondary line) when set, or just a
- * small "name this" affordance when it isn't. Click the pencil (or the name
- * itself) to edit inline; Enter/blur saves, Escape cancels. Never touches
- * chain/server state — purely a `create-storage` localStorage round-trip via
- * `onRename`.
+ * Local-only nickname for a campaign card — the card's title when set (with
+ * the address demoted below), or a small "name this" affordance when unset.
+ * Click the pencil (or the name) to edit inline; Enter/blur saves, Escape
+ * cancels. Never touches chain/server state.
  */
 function CampaignNameField({
   campaign,
@@ -467,7 +518,7 @@ function CampaignNameField({
             href={etherscanAddressUrl(campaign)}
             target="_blank"
             rel="noreferrer"
-            className="link-gold font-data text-xs"
+            className="link-gold font-data text-xs break-all"
           >
             {shortAddress(campaign)}
           </a>
@@ -498,10 +549,8 @@ function CampaignNameField({
   );
 }
 
-/** Only ever mounted once `token` has passed an `isAddress` + non-zero check
- * (see `CampaignCard` above) — `useMetadata` builds a token client from the
- * address unconditionally, so an invalid address would throw during render
- * rather than surfacing as a query error. */
+/** Only mounted once `token` passed an `isAddress` + non-zero check (see
+ * `CampaignCard`) — `useMetadata` builds a token client unconditionally. */
 function TokenSymbolBadge({ token }: { token: Address }) {
   const metadata = useMetadata(token);
 
@@ -518,4 +567,26 @@ function TokenSymbolBadge({ token }: { token: Address }) {
       {metadata.data.symbol ?? metadata.data.name ?? "Unknown"}
     </span>
   );
+}
+
+/** Renders nothing — resolves a campaign's token symbol via `useMetadata` and
+ * reports it up so the parent can match it in symbol search. Only mounted for
+ * campaigns with a valid, non-zero token address (guarded by the caller). */
+function TokenSymbolResolver({
+  campaign,
+  token,
+  onResolved,
+}: {
+  campaign: string;
+  token: Address;
+  onResolved: (campaign: string, symbol: string) => void;
+}) {
+  const metadata = useMetadata(token);
+  const symbol = metadata.data?.symbol ?? metadata.data?.name;
+
+  useEffect(() => {
+    if (symbol) onResolved(campaign, symbol);
+  }, [campaign, symbol, onResolved]);
+
+  return null;
 }
