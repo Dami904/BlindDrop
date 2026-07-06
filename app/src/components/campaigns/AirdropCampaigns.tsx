@@ -1,13 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAccount, useReadContract, useReadContracts } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useReadContracts } from "wagmi";
 import { isAddress, zeroAddress, type Address, type Hex } from "viem";
 import { useMetadata } from "@zama-fhe/react-sdk";
-import { confidentialAirdropCloneableAbi } from "@tokenops/sdk/fhe-airdrop";
-import { etherscanAddressUrl } from "@/lib/packet";
+import {
+  asEncryptedHandle,
+  confidentialAirdropCloneableAbi,
+  createConfidentialAirdropClient,
+} from "@tokenops/sdk/fhe-airdrop";
+import { etherscanAddressUrl, SEPOLIA_CHAIN_ID } from "@/lib/packet";
 import { BLINDDROP_REGISTRY_ADDRESS, blindDropRegistryAbi } from "@/lib/registry";
-import { loadCampaignNames, saveCampaignName } from "@/lib/create-storage";
+import {
+  loadCampaignNames,
+  loadPackets,
+  saveCampaignName,
+  type StoredPacketsRecord,
+} from "@/lib/create-storage";
 import { CampaignControls } from "@/components/create/CampaignControls";
 import type { DeployedCampaign } from "@/components/create/CampaignStep";
 import type { CampaignSort } from "@/components/campaigns/toolbar";
@@ -17,6 +26,38 @@ import type { CampaignSort } from "@/components/campaigns/toolbar";
  * so an address is the campaign's admin iff that read returns true. Using the
  * well-known constant lets the admin check share the same batched multicall. */
 const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
+
+/** How many concurrent claim-status reads to run at once when an admin checks
+ * their saved packets — bounded so a large recipient list doesn't fire hundreds
+ * of simultaneous RPC calls. Mirrors ClaimPacketsStep's status pool. */
+const CLAIM_CHECK_CONCURRENCY = 5;
+
+/**
+ * Tiny inline promise pool: runs `worker` over `items` with at most
+ * `concurrency` in flight. Per-item failures are surfaced via `onSettle`
+ * (as `{ ok: false }`) rather than rejecting the pool, so one unreadable
+ * packet is treated as "unknown" instead of aborting the whole check.
+ */
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+  onSettle: (item: T, result: { ok: true; value: R } | { ok: false; error: unknown }) => void
+): Promise<void> {
+  let cursor = 0;
+  async function runNext(): Promise<void> {
+    while (cursor < items.length) {
+      const item = items[cursor++];
+      try {
+        const value = await worker(item);
+        onSettle(item, { ok: true, value });
+      } catch (error) {
+        onSettle(item, { ok: false, error });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, runNext));
+}
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -331,6 +372,51 @@ function CampaignCard({
   const style = STATUS_STYLE[status];
   const hasToken = !loading && !meta.failed && meta.token && isAddress(meta.token) && meta.token !== zeroAddress;
 
+  // The admin's own local record of this campaign's sealed packets, if this
+  // browser is the one that created it. Loaded from localStorage on mount
+  // (synchronous, client-only) — absent for campaigns sealed elsewhere, which
+  // deliberately stay fully sealed.
+  const publicClient = usePublicClient({ chainId: SEPOLIA_CHAIN_ID });
+  const [packetsRecord, setPacketsRecord] = useState<StoredPacketsRecord | null>(null);
+  const [checkingClaims, setCheckingClaims] = useState(false);
+  const [claimedCount, setClaimedCount] = useState<number | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPacketsRecord(loadPackets(campaign));
+  }, [campaign]);
+
+  /**
+   * Reads on-chain claim status for every locally-stored packet via
+   * `isSignatureClaimed(user, encryptedAmountHandle)` — the same manual,
+   * button-triggered check ClaimPacketsStep uses. Never auto-polled.
+   * Per-packet failures count as "unknown" (not claimed) rather than aborting
+   * the batch. Crash-trapped: only builds a client with a live publicClient
+   * and a valid campaign address.
+   */
+  async function checkClaims() {
+    if (!packetsRecord || checkingClaims || !publicClient || !isAddress(campaign)) return;
+    setCheckingClaims(true);
+    setClaimError(null);
+    try {
+      const airdrop = createConfidentialAirdropClient({ publicClient, address: campaign as Address });
+      let claimed = 0;
+      await runWithConcurrency(
+        packetsRecord.packets,
+        CLAIM_CHECK_CONCURRENCY,
+        (gp) => airdrop.isSignatureClaimed(gp.address, asEncryptedHandle(gp.packet.encryptedInput.handle)),
+        (_gp, result) => {
+          if (result.ok && result.value) claimed += 1;
+        }
+      );
+      setClaimedCount(claimed);
+    } catch {
+      setClaimError("Couldn't check claims — check your connection and try again.");
+    } finally {
+      setCheckingClaims(false);
+    }
+  }
+
   const canManage =
     !loading &&
     !meta.failed &&
@@ -345,16 +431,31 @@ function CampaignCard({
       style={{ borderColor: "var(--line)", background: "var(--ink-3)" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {loading ? (
-          <span className="redaction inline-block h-5 w-16 rounded" aria-hidden />
-        ) : (
-          <span
-            className="badge"
-            style={{ borderColor: style.border, background: style.bg, color: style.color }}
-          >
-            {style.label}
-          </span>
-        )}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {loading ? (
+            <span className="redaction inline-block h-5 w-16 rounded" aria-hidden />
+          ) : (
+            <span
+              className="badge"
+              style={{ borderColor: style.border, background: style.bg, color: style.color }}
+            >
+              {style.label}
+            </span>
+          )}
+          {!loading && !meta.failed && meta.isAdmin && (
+            <span
+              className="badge"
+              style={{
+                borderColor: "var(--gold)",
+                background: "var(--gold-dim)",
+                color: "var(--callout-gold-text)",
+              }}
+              title="You hold this campaign's admin role."
+            >
+              You · Admin
+            </span>
+          )}
+        </div>
         {!name && (
           <a
             href={etherscanAddressUrl(campaign)}
@@ -390,23 +491,78 @@ function CampaignCard({
       <div
         className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
         style={{ color: "var(--text-faint)" }}
-        title="Encrypted on-chain — visible to no one."
       >
-        <span className="inline-flex items-center gap-1.5">
+        <span
+          className="inline-flex items-center gap-1.5"
+          title="Encrypted on-chain — visible to no one."
+        >
           <span className="eyebrow" style={{ fontSize: "0.625rem" }}>
             TOTAL
           </span>
           <span className="redaction inline-block h-3 w-14 rounded" aria-hidden />
           <span>sealed</span>
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="eyebrow" style={{ fontSize: "0.625rem" }}>
-            RECIPIENTS
+        {packetsRecord ? (
+          <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="eyebrow" style={{ fontSize: "0.625rem" }}>
+              RECIPIENTS
+            </span>
+            <span className="font-data" style={{ color: "var(--text-dim)" }}>
+              {packetsRecord.packets.length}
+            </span>
+            <span>— your saved copy</span>
           </span>
-          <span className="redaction inline-block h-3 w-8 rounded" aria-hidden />
-          <span>sealed</span>
-        </span>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1.5"
+            title="Encrypted on-chain — visible to no one."
+          >
+            <span className="eyebrow" style={{ fontSize: "0.625rem" }}>
+              RECIPIENTS
+            </span>
+            <span className="redaction inline-block h-3 w-8 rounded" aria-hidden />
+            <span>sealed</span>
+          </span>
+        )}
       </div>
+
+      {packetsRecord && (
+        <div
+          className="mt-1 flex flex-col gap-1.5 border-t pt-2"
+          style={{ borderColor: "var(--line)" }}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span style={{ color: "var(--text-dim)" }}>
+              {claimedCount !== null ? (
+                <>
+                  <span className="font-data" style={{ color: "var(--text)" }}>
+                    {claimedCount}
+                  </span>{" "}
+                  of {packetsRecord.packets.length} claimed
+                </>
+              ) : (
+                <>Claim status not checked yet.</>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => void checkClaims()}
+              disabled={checkingClaims || !publicClient}
+              className="btn btn-ghost text-xs"
+            >
+              {checkingClaims ? "Checking…" : claimedCount !== null ? "Re-check claims" : "Check claims"}
+            </button>
+          </div>
+          {claimError && (
+            <p className="text-xs break-words" style={{ color: "var(--callout-warn-text)" }}>
+              {claimError}
+            </p>
+          )}
+          <p className="text-[0.6875rem]" style={{ color: "var(--text-faint)" }}>
+            From your saved packets in this browser.
+          </p>
+        </div>
+      )}
 
       {canManage && connectedAddress && (
         <div className="mt-1 border-t pt-2" style={{ borderColor: "var(--line)" }}>
