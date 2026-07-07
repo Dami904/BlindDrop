@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useAccount } from "wagmi";
 import type { Hex } from "viem";
 import { RecipientsStep, RECIPIENTS_DRAFT_KEY } from "@/components/create/RecipientsStep";
 import { CampaignStep, type DeployedCampaign } from "@/components/create/CampaignStep";
@@ -29,6 +30,7 @@ const STEPS = [
 ] as const;
 
 export default function CreatePage() {
+  const { address } = useAccount();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [entries, setEntries] = useState<RecipientEntry[]>([newRecipientEntry()]);
   const [deployed, setDeployed] = useState<DeployedCampaign | null>(null);
@@ -38,13 +40,16 @@ export default function CreatePage() {
 
   // Restore a deployed campaign (public on-chain identity — airdrop address,
   // token, claim window) so an admin who navigated away or reloaded lands
-  // back on step 3 instead of being forced to re-deploy. Runs once on mount.
-  // If the recipients draft hasn't been restored yet (RecipientsStep only
-  // restores it when actually mounted, i.e. on step 1), restore it here too
-  // so the jump straight to step 3 has a recipient list to work with.
+  // back on step 3 instead of being forced to re-deploy. Scoped to the
+  // campaign's OWN admin wallet: a different (or no) connected wallet never
+  // sees another wallet's in-progress campaign or its sealed packets. Re-runs
+  // when the connected wallet changes so the admin's campaign reappears only
+  // for them.
   useEffect(() => {
+    if (deployed) return;
     const stored = loadDeployedCampaign();
     if (!stored) return;
+    if (!address || address.toLowerCase() !== stored.admin.toLowerCase()) return;
     try {
       const raw = localStorage.getItem(RECIPIENTS_DRAFT_KEY);
       if (raw) {
@@ -60,7 +65,7 @@ export default function CreatePage() {
     setDeployed(stored);
     setStep(3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [address]);
 
   // Persist the deployed campaign's public identity whenever it changes.
   useEffect(() => {
