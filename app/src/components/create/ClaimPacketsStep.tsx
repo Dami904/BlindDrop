@@ -48,6 +48,7 @@ interface GeneratedPacket {
 interface EncryptFailure {
   recipient: RecipientRow;
   message: string;
+  detail?: string;
 }
 
 /** How many concurrent relayer encryption requests to run at once — bounded so
@@ -276,10 +277,15 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
               inputProof: result.value.inputProof,
             });
           } else {
-            failures.push({
-              recipient,
-              message: describeMutationError(result.error, "Couldn't encrypt this allocation.").message,
-            });
+            {
+              const described = describeMutationError(result.error, "Couldn't encrypt this allocation.");
+              const raw = result.error instanceof Error ? result.error.message : String(result.error);
+              failures.push({
+                recipient,
+                message: described.message,
+                detail: described.detail ?? raw,
+              });
+            }
           }
           setEncryptSettled((n) => n + 1);
         }
@@ -562,6 +568,20 @@ export function ClaimPacketsStep({ recipients, deployed }: ClaimPacketsStepProps
               </li>
             ))}
           </ul>
+          {encryptFailures[0]?.detail && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer" style={{ color: "var(--text-faint)" }}>
+                Technical details
+              </summary>
+              <p className="font-data mt-1 break-all" style={{ color: "var(--text-faint)" }}>
+                {encryptFailures[0].detail}
+              </p>
+            </details>
+          )}
+          <p className="mt-2 text-xs" style={{ color: "var(--text-dim)" }}>
+            Encryption runs through the Zama relayer — a temporary relayer hiccup fails the whole
+            batch. Waiting a moment and retrying usually clears it.
+          </p>
           <button type="button" onClick={retryFailed} className="btn btn-gold mt-3 w-fit text-xs">
             Retry failed encryption{encryptFailures.length === 1 ? "" : "s"}
           </button>
