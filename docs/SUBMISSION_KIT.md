@@ -11,7 +11,7 @@ Film: screen recording of the live app + your webcam/voice. Rehearse once; keep 
 > been — confidential token distribution where amounts are encrypted end-to-end and the
 > recipient list never touches the chain. Built on the TokenOps SDK and Zama's FHE protocol."
 
-**[0:20–0:40] The 5-second pitch of how (landing page, hover the redacted bars)**
+**[0:25–0:40] The 5-second pitch of how (landing page, hover/tap the redacted bars)**
 > "Amounts are encrypted in my browser before they ever leave it. On-chain, they're FHE ciphertexts —
 > only each recipient can decrypt their own. Let me show you the whole thing, live on Sepolia."
 
@@ -41,9 +41,10 @@ Film: screen recording of the live app + your webcam/voice. Rehearse once; keep 
   disclosure belongs to the person whose money it is. Enforced by the FHE access-control layer,
   not by us."
 - Disperse: "the push model — payroll for any list size in one transaction, nothing to claim."
-- Campaign cards: "my campaigns, indexed by our own on-chain registry contract — and where other
-  apps print totals and recipient counts, ours shows sealed bars, because that data isn't on-chain
-  to leak."
+- Campaigns page: "a control room for all my distributions — search, sort, pause, sweep unclaimed
+  funds. Where other apps print totals and recipient counts on the card, ours stays sealed — the
+  amounts aren't on-chain to leak. I can see who's claimed, from my own records; nobody else can
+  see anything."
 - Faucet + Archivist guide widget: "judges can self-serve tokens and be walked through everything."
 
 **[2:40–3:00] Close (face to camera)**
@@ -85,11 +86,19 @@ Two distribution models in one app:
 Works with any ERC-7984 confidential token, including cUSDT.
 
 **5/**
-Built for @zama_fhe's Developer Program Special Bounty with the @tokenops SDK — every on-chain
-operation runs on TokenOps' OpenZeppelin-audited contracts. We added one contract of our own: a
-minimal on-chain campaign registry (stores only public metadata).
+The part FHE uniquely unlocks: selective disclosure.
+
+A recipient can grant one address — an accountant, an auditor — the right to decrypt *their* amount.
+Time-limited. Revocable. Enforced by the on-chain access-control layer, not by us.
+
+Other tools bake a fixed auditor into the contract. Here, disclosure belongs to whoever's money it is.
 
 **6/**
+Built for @zama_fhe's Developer Program Special Bounty with the @tokenops SDK — every on-chain
+operation runs on TokenOps' OpenZeppelin-audited contracts. We added one of our own: a minimal,
+verified campaign registry (stores only already-public metadata).
+
+**7/**
 Try it yourself on Sepolia — faucet included, takes ~3 minutes:
 🌐 [live app URL]
 🧑‍💻 [github repo URL]
