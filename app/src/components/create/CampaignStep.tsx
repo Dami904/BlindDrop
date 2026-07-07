@@ -67,7 +67,10 @@ export function CampaignStep({ recipients, userSalt, deployed, onDeployed, onNex
   const defaultToken = getConfidentialTestTokenAddress(sepolia.id) ?? "";
 
   const [tokenAddress, setTokenAddress] = useState<string>(defaultToken);
-  const [startTimestamp, setStartTimestamp] = useState<number>(now + 5 * 60);
+  // Default the claim window to open immediately (a minute in the past guards
+  // against minor clock skew) — claims can't succeed until the campaign is
+  // funded anyway, so a future start only adds a confusing "not started" wait.
+  const [startTimestamp, setStartTimestamp] = useState<number>(now - 60);
   const [endTimestamp, setEndTimestamp] = useState<number>(now + 30 * 86400);
   const [deployError, setDeployError] = useState<FriendlyError | null>(null);
 
