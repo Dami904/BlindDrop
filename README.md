@@ -110,3 +110,7 @@ Contracts: `cd contracts && npm ci && npx hardhat test` (see [contracts/README.m
 - [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) — exact confidentiality boundary & trust assumptions
 - [docs/SECURITY.md](docs/SECURITY.md) — security posture & audit lineage
 - [docs/SUBMISSION_KIT.md](docs/SUBMISSION_KIT.md) — demo video script & X thread
+
+## License
+
+MIT — see [LICENSE](LICENSE).
